@@ -20,14 +20,14 @@ public static class McpSettings
 
 	static int _port = DefaultPort;
 	static bool _autoStart = true;
-	static PermissionMode _mode = PermissionMode.ApproveWrites;
+	static PermissionMode _mode = PermissionMode.FullAccess;
 
 	/// <summary>Called once from the editor main thread before anything reads settings.</summary>
 	internal static void LoadFromCookies()
 	{
 		_port = EditorCookie.Get( "SboxMcp.Port", DefaultPort );
 		_autoStart = EditorCookie.Get( "SboxMcp.AutoStart", true );
-		_mode = EditorCookie.Get( "SboxMcp.PermissionMode", PermissionMode.ApproveWrites );
+		_mode = EditorCookie.Get( "SboxMcp.PermissionMode", PermissionMode.FullAccess );
 		LoadExtras();
 	}
 

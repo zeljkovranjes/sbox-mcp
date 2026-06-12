@@ -29,10 +29,10 @@ public class SettingsPage : Widget
 		modeRow.Spacing = 6;
 
 		var modeCombo = modeRow.Add( new ComboBox( permGroup ) { MinimumWidth = 180 } );
-		modeCombo.AddItem( "Approve writes", "how_to_reg", () => McpSettings.Mode = PermissionMode.ApproveWrites,
-			selected: McpSettings.Mode == PermissionMode.ApproveWrites );
 		modeCombo.AddItem( "Full access", "bolt", () => McpSettings.Mode = PermissionMode.FullAccess,
 			selected: McpSettings.Mode == PermissionMode.FullAccess );
+		modeCombo.AddItem( "Approve writes", "how_to_reg", () => McpSettings.Mode = PermissionMode.ApproveWrites,
+			selected: McpSettings.Mode == PermissionMode.ApproveWrites );
 		modeCombo.AddItem( "Read-only", "visibility", () => McpSettings.Mode = PermissionMode.ReadOnly,
 			selected: McpSettings.Mode == PermissionMode.ReadOnly );
 		modeRow.AddStretchCell();

@@ -104,10 +104,16 @@ public static class ComponentTools
 		using var undo = session.UndoScope( $"MCP: set {key}" )
 			.WithComponentChanges( new[] { component } ).Push();
 
-		node[key] = value.ValueKind == JsonValueKind.Null ? null : JsonNode.Parse( value.GetRawText() );
+		// apply ONLY the target property: deserializing the full snapshot would
+		// re-apply every other property too, and a resource that is still
+		// loading serializes as null - the round trip would clobber it
+		var minimal = new JsonObject();
+		if ( node["__type"] is JsonNode typeNode ) minimal["__type"] = typeNode.DeepClone();
+		if ( node["__guid"] is JsonNode guidNode ) minimal["__guid"] = guidNode.DeepClone();
+		minimal[key] = value.ValueKind == JsonValueKind.Null ? null : JsonNode.Parse( value.GetRawText() );
 
 		// Deserialize() only queues the data - DeserializeImmediately applies it now
-		component.DeserializeImmediately( node );
+		component.DeserializeImmediately( minimal );
 
 		return new { set = key, on = component.GetType().Name, now = component.Serialize() };
 	}

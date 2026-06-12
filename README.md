@@ -44,8 +44,8 @@ claude mcp add --transport http sbox http://127.0.0.1:9090/sbox-mcp
 
 | Mode | Behavior |
 |---|---|
-| **Full access** | Every tool runs without asking. |
-| **Approve writes** *(default)* | Tools that modify your project pop an Approve/Deny card in the dock (60s timeout = deny). Read-only tools always run. |
+| **Full access** *(default)* | Every tool runs without asking. |
+| **Approve writes** | Tools that modify your project pop an Approve/Deny card in the dock (60s timeout = deny). Read-only tools always run. |
 | **Read-only** | Write tools are rejected with a message the AI understands. |
 
 Every scene mutation runs inside an editor undo scope — anything the AI does, you can Ctrl+Z.

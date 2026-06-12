@@ -1,3 +1,5 @@
+<p align="center"><img src="logo.png" width="140" alt="s&box MCP logo"></p>
+
 # s&box MCP
 
 **An MCP server that runs inside the s&box editor.** Connect Claude Code, Claude Desktop, Cursor or VS Code and let AI build games in the editor — scenes, GameObjects, components, prefabs, assets, materials, sounds, input actions, cloud content, ModelDoc, AnimGraph, ShaderGraph, ActionGraph, code files (C#/Razor/SCSS), console diagnostics, play mode and screenshots. 70+ tools, an in-editor dashboard, and a setup that is exactly two steps.

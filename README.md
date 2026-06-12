@@ -88,7 +88,7 @@ Notes on graph authoring: `.vmdl` and `.vanmgrph` are KV3 text, ShaderGraph/Acti
 
 ## Development
 
-`dev/SboxMcp.Dev.csproj` compiles all `Editor/` sources against your installed s&box assemblies (`dotnet build dev/SboxMcp.Dev.csproj`, override the path with `-p:SboxManaged=...`). `dev/SboxMcp.Tests` covers the protocol, registry, server and path jail layers (`dotnet test`). The protocol/registry layers are Sandbox-free by design so they stay testable.
+The s&box editor compiles `Editor/` directly — just edit and let it hot-reload. The `Editor/Server` and `Editor/Registry` layers are deliberately Sandbox-free so they can be unit-tested outside the editor.
 
 ## License
 

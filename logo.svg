@@ -1,0 +1,35 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- s&box MCP logo: a hub connecting tools, in the dashboard's category colors -->
+  <defs>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="50%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#EC4899"/>
+    </linearGradient>
+  </defs>
+
+  <!-- tile -->
+  <rect x="8" y="8" width="496" height="496" rx="96" fill="#15171C" stroke="#2A2D36" stroke-width="4"/>
+
+  <!-- spokes -->
+  <g stroke-width="9" stroke-linecap="round">
+    <line x1="256" y1="256" x2="256"   y2="116" stroke="#4F8DFD" opacity="0.55"/>
+    <line x1="256" y1="256" x2="377.2" y2="186" stroke="#FFA94D" opacity="0.55"/>
+    <line x1="256" y1="256" x2="377.2" y2="326" stroke="#A78BFA" opacity="0.55"/>
+    <line x1="256" y1="256" x2="256"   y2="396" stroke="#F472B6" opacity="0.55"/>
+    <line x1="256" y1="256" x2="134.8" y2="326" stroke="#2DD4BF" opacity="0.55"/>
+    <line x1="256" y1="256" x2="134.8" y2="186" stroke="#4ADE80" opacity="0.55"/>
+  </g>
+
+  <!-- satellite nodes (tool categories) -->
+  <circle cx="256"   cy="116" r="28" fill="#4F8DFD"/>
+  <circle cx="377.2" cy="186" r="28" fill="#FFA94D"/>
+  <circle cx="377.2" cy="326" r="28" fill="#A78BFA"/>
+  <circle cx="256"   cy="396" r="28" fill="#F472B6"/>
+  <circle cx="134.8" cy="326" r="28" fill="#2DD4BF"/>
+  <circle cx="134.8" cy="186" r="28" fill="#4ADE80"/>
+
+  <!-- hub -->
+  <circle cx="256" cy="256" r="58" fill="#15171C" stroke="url(#ring)" stroke-width="13"/>
+  <circle cx="256" cy="256" r="21" fill="#F3F4F6"/>
+</svg>

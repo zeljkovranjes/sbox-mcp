@@ -6,6 +6,7 @@
   "Schema": 1,
   "HasAssets": false,
   "HasCode": false,
+  "IncludeSourceFiles": true,
   "RootNamespace": "SboxMcp",
   "Metadata": {
     "Summary": "MCP server inside the s&box editor. Connect Claude Code, Cursor, Claude Desktop or VS Code and let AI drive scenes, assets, ModelDoc, AnimGraph, ShaderGraph, ActionGraph and more.",

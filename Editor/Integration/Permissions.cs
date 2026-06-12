@@ -45,6 +45,9 @@ public static class PermissionGate
 	/// <summary>Raised when the pending list changes, so the UI can refresh.</summary>
 	public static event Action Changed;
 
+	/// <summary>Bumped on every pending-list change; UI polls this from the frame tick.</summary>
+	public static int Version { get; private set; }
+
 	public static IReadOnlyList<ApprovalRequest> Pending
 	{
 		get { lock ( _pending ) return _pending.ToArray(); }
@@ -76,7 +79,7 @@ public static class PermissionGate
 					ArgsSummary = Summarize( args )
 				};
 
-				lock ( _pending ) _pending.Add( request );
+				lock ( _pending ) { _pending.Add( request ); Version++; }
 				Changed?.Invoke();
 
 				try
@@ -86,7 +89,7 @@ public static class PermissionGate
 				}
 				finally
 				{
-					lock ( _pending ) _pending.Remove( request );
+					lock ( _pending ) { _pending.Remove( request ); Version++; }
 					Changed?.Invoke();
 				}
 			}

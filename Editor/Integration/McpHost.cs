@@ -23,6 +23,7 @@ public static class McpHost
 	static bool _initialized;
 
 	public static McpServer Server { get; private set; }
+	public static ToolRegistry Registry { get; private set; }
 	public static string LastError { get; private set; }
 
 	/// <summary>Raised when server state or LastError changes.</summary>
@@ -51,6 +52,7 @@ public static class McpHost
 
 		var registry = new ToolRegistry();
 		registry.AddAssembly( typeof( McpHost ).Assembly );
+		Registry = registry;
 
 		Server = new McpServer( registry, InvokeTool );
 		Server.StateChanged += () => Changed?.Invoke();

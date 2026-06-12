@@ -36,6 +36,9 @@ public static class ActivityLog
 
 	public static int TotalCalls { get; private set; }
 
+	/// <summary>Bumped on every change; UI polls this from the frame tick.</summary>
+	public static int Version { get; private set; }
+
 	internal static void Record( ActivityRecord record )
 	{
 		lock ( _records )
@@ -44,6 +47,7 @@ public static class ActivityLog
 			while ( _records.Count > Capacity )
 				_records.RemoveLast();
 			TotalCalls++;
+			Version++;
 		}
 
 		Added?.Invoke( record );
@@ -51,7 +55,12 @@ public static class ActivityLog
 
 	public static void Clear()
 	{
-		lock ( _records ) _records.Clear();
+		lock ( _records )
+		{
+			_records.Clear();
+			Version++;
+		}
+
 		Cleared?.Invoke();
 	}
 }

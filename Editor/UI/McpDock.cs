@@ -40,9 +40,20 @@ public class McpDock : Widget
 	readonly ToolsPage _tools;
 
 	int _active;
+	readonly RealTimeSince _sinceCreated = 0;
 
 	// Widget.MinimumWidth is a no-op for docks; Qt asks this instead
 	protected override Vector2 MinimumSizeHint() => new( 360, 220 );
+
+	protected override void OnResize()
+	{
+		base.OnResize();
+
+		// remember the user's size for future sessions; the settle delay keeps
+		// the initial open/layout resizes from clobbering the saved value
+		if ( _sinceCreated > 1f && Width > 100 && Height > 100 )
+			McpSettings.DockSize = Size;
+	}
 
 	/// <summary>Opens (or raises) the dashboard.</summary>
 	public static McpDock Open()
@@ -52,8 +63,13 @@ public class McpDock : Widget
 		if ( dock is null )
 		{
 			dock = new McpDock( EditorWindow );
+
+			// restore the last size the user resized it to
+			dock.Size = McpSettings.DockSize;
+
 			// floating by default - the user can dock it wherever they like
 			EditorWindow.DockManager.AddDock( null, dock, DockArea.Floating );
+			dock.Size = McpSettings.DockSize;
 		}
 
 		EditorWindow.DockManager.RaiseDock( dock );

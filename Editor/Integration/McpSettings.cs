@@ -49,6 +49,20 @@ public static class McpSettings
 		set { _mode = value; EditorCookie.Set( "SboxMcp.PermissionMode", value ); }
 	}
 
+	// ---- dashboard window size (persisted) ---------------------------------
+
+	static Vector2 _dockSize = new( 420, 560 );
+
+	public static Vector2 DockSize
+	{
+		get => _dockSize;
+		set
+		{
+			_dockSize = value;
+			EditorCookie.Set( "SboxMcp.DockSize", $"{(int)value.x}x{(int)value.y}" );
+		}
+	}
+
 	// ---- per-tool enable/disable overrides (persisted) ---------------------
 
 	// reference-swapped on change so worker threads can read without locks;
@@ -96,6 +110,11 @@ public static class McpSettings
 
 	static void LoadExtras()
 	{
+		var size = EditorCookie.Get( "SboxMcp.DockSize", "" );
+		var sizeParts = size.Split( 'x' );
+		if ( sizeParts.Length == 2 && int.TryParse( sizeParts[0], out var w ) && int.TryParse( sizeParts[1], out var h ) )
+			_dockSize = new Vector2( Math.Max( w, 360 ), Math.Max( h, 220 ) );
+
 		var overrides = EditorCookie.Get( "SboxMcp.ToolOverrides", "" );
 		_toolDisabledOverrides = overrides
 			.Split( ';', StringSplitOptions.RemoveEmptyEntries )

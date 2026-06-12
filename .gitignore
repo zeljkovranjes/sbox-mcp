@@ -1,6 +1,10 @@
 # Local design docs / plans (not published)
 docs/superpowers/
 
+# Local dev harness + Claude workspace
+dev/
+.claude/
+
 # Build artifacts
 bin/
 obj/

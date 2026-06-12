@@ -14,6 +14,10 @@ public sealed class ActivityRecord
 	public bool Ok { get; init; }
 	public string Error { get; init; }
 	public long DurationMs { get; init; }
+
+	/// <summary>The undo entry this call created, when it mutated the scene -
+	/// lets the UI revert this specific action.</summary>
+	public Sandbox.Helpers.UndoSystem.Entry UndoEntry { get; set; }
 }
 
 /// <summary>

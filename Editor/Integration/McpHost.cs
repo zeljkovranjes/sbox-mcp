@@ -187,14 +187,31 @@ public static class McpHost
 		var sw = Stopwatch.StartNew();
 		try
 		{
+			Sandbox.Helpers.UndoSystem.Entry undoEntry = null;
+
 			var result = await MainThreadDispatcher.Run( () =>
 			{
 				// editor operations expect the edited scene to be the active
 				// scene scope (the engine's own cut/paste/clone paths do this)
-				var scene = SceneEditorSession.Active?.Scene;
-				using var sceneScope = scene?.Push();
+				var session = SceneEditorSession.Active;
+				using var sceneScope = session?.Scene?.Push();
 
-				return tool.Invoke( args );
+				Sandbox.Helpers.UndoSystem.Entry beforeEntry = null;
+				session?.UndoSystem.Back.TryPeek( out beforeEntry );
+
+				var r = tool.Invoke( args );
+
+				// remember the undo entry this call created so the activity
+				// feed can revert this specific action
+				if ( session is not null
+					&& session.UndoSystem.Back.TryPeek( out var after )
+					&& !ReferenceEquals( after, beforeEntry )
+					&& (after.Name?.StartsWith( "MCP" ) ?? false) )
+				{
+					undoEntry = after;
+				}
+
+				return r;
 			} );
 
 			// async tools (cloud downloads etc.) return a Task from the main
@@ -214,7 +231,8 @@ public static class McpHost
 				Category = tool.Meta.Category,
 				ArgsDigest = PermissionGate.Summarize( args ),
 				Ok = true,
-				DurationMs = sw.ElapsedMilliseconds
+				DurationMs = sw.ElapsedMilliseconds,
+				UndoEntry = undoEntry
 			} );
 
 			return result;

@@ -129,6 +129,35 @@ public class ActivityPage : Widget
 		}
 	}
 
+	/// <summary>
+	/// Reverts one specific MCP undo entry, wherever it sits in the undo
+	/// stack. Newer edits to the same objects can override the result -
+	/// that is inherent to out-of-order undo.
+	/// </summary>
+	internal static void RevertEntry( Sandbox.Helpers.UndoSystem.Entry entry )
+	{
+		var session = SceneEditorSession.Active;
+		if ( session is null || entry is null )
+			return;
+
+		var back = session.UndoSystem.Back;
+		if ( !back.Contains( entry ) )
+		{
+			McpHost.Log.Info( "That action is no longer on the undo stack" );
+			return;
+		}
+
+		entry.Undo?.Invoke();
+
+		// Stack<T> has no Remove - rebuild it without the reverted entry
+		var remaining = back.Where( e => !ReferenceEquals( e, entry ) ).ToList();
+		back.Clear();
+		for ( var i = remaining.Count - 1; i >= 0; i-- )
+			back.Push( remaining[i] );
+
+		McpHost.Log.Info( $"Reverted '{entry.Name}'" );
+	}
+
 	static void CopyTranscript()
 	{
 		var sb = new System.Text.StringBuilder();
@@ -167,6 +196,27 @@ public class ActivityRow : Widget
 		_record = record;
 		FixedHeight = 30;
 		ToolTip = record.Error ?? record.ArgsDigest;
+	}
+
+	protected override void OnContextMenu( ContextMenuEvent e )
+	{
+		var menu = new Menu( this );
+
+		var revertable = _record.UndoEntry is not null
+			&& (SceneEditorSession.Active?.UndoSystem.Back.Contains( _record.UndoEntry ) ?? false);
+
+		var revert = menu.AddOption( "Revert this action", "undo",
+			() => ActivityPage.RevertEntry( _record.UndoEntry ) );
+		revert.Enabled = revertable;
+		revert.StatusTip = revertable
+			? "Undo exactly what this call changed (newer edits to the same objects may override the result)"
+			: "Nothing to revert - this call made no undoable change, or it was already undone";
+
+		menu.AddOption( "Copy row", "content_copy", () => EditorUtility.Clipboard.Copy(
+			$"{_record.Time:HH:mm:ss} {(_record.Ok ? "ok" : "ERROR")} {_record.Category} {_record.ToolName} {_record.ArgsDigest} {_record.Error} ({_record.DurationMs} ms)" ) );
+
+		menu.OpenAtCursor();
+		e.Accepted = true;
 	}
 
 	protected override void OnPaint()

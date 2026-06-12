@@ -18,6 +18,16 @@ public sealed class RegisteredTool
 	public MethodInfo Method { get; }
 	public McpToolDescriptor Descriptor { get; }
 
+	/// <summary>
+	/// Why this tool cannot run right now (e.g. "Not Installed"), or null when
+	/// it is available. Evaluated live so integrations installed mid-session
+	/// light up without a restart.
+	/// </summary>
+	public string UnavailableReason =>
+		Meta.Requires is null ? null : ToolRegistry.RequirementResolver?.Invoke( Meta.Requires );
+
+	public bool IsAvailable => UnavailableReason is null;
+
 	internal RegisteredTool( McpToolAttribute meta, MethodInfo method )
 	{
 		Meta = meta;
@@ -84,6 +94,13 @@ public sealed class RegisteredTool
 /// </summary>
 public sealed class ToolRegistry
 {
+	/// <summary>
+	/// Maps a tool's Requires key to an unavailability reason (short, e.g.
+	/// "Not Installed") or null when the requirement is satisfied. Null
+	/// resolver = everything available.
+	/// </summary>
+	public static Func<string, string> RequirementResolver { get; set; }
+
 	internal static readonly JsonSerializerOptions BindOptions = new()
 	{
 		PropertyNameCaseInsensitive = true,

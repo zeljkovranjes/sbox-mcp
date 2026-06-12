@@ -246,7 +246,8 @@ public sealed class McpServer : IDisposable
 				return (200, JsonRpcWriter.Result( rpc.Id, new { } ), null);
 
 			case "tools/list":
-				return (200, JsonRpcWriter.Result( rpc.Id, McpResults.ToolsList( _registry.Tools.Select( t => t.Descriptor ) ) ), null);
+				return (200, JsonRpcWriter.Result( rpc.Id,
+					McpResults.ToolsList( _registry.Tools.Where( t => t.IsAvailable ).Select( t => t.Descriptor ) ) ), null);
 
 			case "tools/call":
 				return (200, await CallTool( rpc ), null);
@@ -268,6 +269,10 @@ public sealed class McpServer : IDisposable
 		var tool = _registry.Find( name );
 		if ( tool is null )
 			return JsonRpcWriter.Error( rpc.Id, JsonRpcError.InvalidParams, $"Unknown tool '{name}'" );
+
+		if ( tool.UnavailableReason is string reason )
+			return JsonRpcWriter.Error( rpc.Id, JsonRpcError.InvalidParams,
+				$"'{name}' is unavailable: {reason} (requires '{tool.Meta.Requires}')" );
 
 		JsonElement? args = p.TryGetProperty( "arguments", out var a ) && a.ValueKind == JsonValueKind.Object
 			? a : null;

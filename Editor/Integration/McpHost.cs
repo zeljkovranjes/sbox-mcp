@@ -61,6 +61,12 @@ public static class McpHost
 
 		McpSettings.LoadFromCookies();
 
+		ToolRegistry.RequirementResolver = key => key switch
+		{
+			Tools.RetargeterTools.Requirement => Tools.RetargeterTools.IsInstalled ? null : "Not Installed",
+			_ => null
+		};
+
 		var registry = new ToolRegistry();
 		registry.AddAssembly( typeof( McpHost ).Assembly );
 		Registry = registry;

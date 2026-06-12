@@ -38,7 +38,8 @@ public static class Palette
 		[ToolCategory.ShaderGraph] = (Color)"#2DD4BF",
 		[ToolCategory.ActionGraph] = (Color)"#A3E635",
 		[ToolCategory.Code] = (Color)"#4ADE80",
-		[ToolCategory.Editor] = (Color)"#FACC15"
+		[ToolCategory.Editor] = (Color)"#FACC15",
+		[ToolCategory.Retargeter] = (Color)"#FB7185"
 	};
 
 	public static Color For( ToolCategory category ) =>

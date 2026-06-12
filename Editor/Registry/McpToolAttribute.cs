@@ -14,7 +14,8 @@ public enum ToolCategory
 	ShaderGraph,
 	ActionGraph,
 	Code,
-	Editor
+	Editor,
+	Retargeter
 }
 
 /// <summary>
@@ -30,6 +31,13 @@ public sealed class McpToolAttribute : Attribute
 
 	/// <summary>Write tools are subject to the permission gate (approve-writes / read-only modes).</summary>
 	public bool Writes { get; init; }
+
+	/// <summary>
+	/// Optional requirement key (e.g. an integration's library ident). The host
+	/// resolves it via ToolRegistry.RequirementResolver; unresolved tools are
+	/// hidden from clients and shown disabled in the tool browser.
+	/// </summary>
+	public string Requires { get; init; }
 
 	public McpToolAttribute( string name, string description, ToolCategory category )
 	{

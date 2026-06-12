@@ -16,6 +16,30 @@ public static class AssetTools
 
 	internal static string ResolveInProject( string path ) => PathJail.Resolve( ProjectRoot, path );
 
+	/// <summary>
+	/// Resolves a path for a NEW asset file. Plain asset paths like
+	/// 'models/new.vmdl' land in the project's Assets mount (where the asset
+	/// system can register them); explicit 'Assets/...'-style or absolute
+	/// paths resolve against the project root. Always jailed to the project.
+	/// </summary>
+	internal static string ResolveNewAssetPath( string path )
+	{
+		var rootResolved = ResolveInProject( path );
+
+		if ( Path.IsPathRooted( path ) || File.Exists( rootResolved ) )
+			return rootResolved;
+
+		var assets = Project.Current?.GetAssetsPath();
+		if ( assets is null )
+			return rootResolved;
+
+		// already targeting the assets folder explicitly?
+		var assetsResolved = PathJail.Resolve( ProjectRoot, Path.Combine( assets, path ) );
+		return rootResolved.StartsWith( Path.GetFullPath( assets ), StringComparison.OrdinalIgnoreCase )
+			? rootResolved
+			: assetsResolved;
+	}
+
 	[McpTool( "asset_search", "Searches project assets by name and/or type extension (vmdl, vmat, prefab, scene, vanmgrph, shdrgrph...).", ToolCategory.Asset )]
 	public static object Search(
 		[Desc( "Name/path substring (case-insensitive); omit for all" )] string query = null,
@@ -70,7 +94,7 @@ public static class AssetTools
 		[Desc( "Resource type extension without dot, e.g. 'prefab', 'scene'" )] string type,
 		[Desc( "Project-relative output path including extension, e.g. 'Assets/prefabs/new.prefab'" )] string path )
 	{
-		var absolute = ResolveInProject( path );
+		var absolute = ResolveNewAssetPath( path );
 
 		if ( File.Exists( absolute ) )
 			throw new InvalidOperationException( $"'{path}' already exists" );
@@ -100,7 +124,7 @@ public static class AssetTools
 		[Desc( "Full new file content" )] string content )
 	{
 		var existing = AssetSystem.FindByPath( path );
-		var absolute = existing?.GetSourceFile( true ) ?? ResolveInProject( path );
+		var absolute = existing?.GetSourceFile( true ) ?? ResolveNewAssetPath( path );
 
 		Directory.CreateDirectory( Path.GetDirectoryName( absolute ) );
 		File.WriteAllText( absolute, content );

@@ -43,8 +43,15 @@ public sealed class JsonRpcRequest
 
 		var request = new JsonRpcRequest { Method = method.GetString() };
 
-		if ( root.TryGetProperty( "id", out var id ) && id.ValueKind != JsonValueKind.Null )
+		if ( root.TryGetProperty( "id", out var id ) )
+		{
+			// JSON-RPC 2.0 forbids null ids; silently treating one as a
+			// notification would hang the client waiting for a response
+			if ( id.ValueKind == JsonValueKind.Null )
+				throw new JsonRpcParseException( "'id' must not be null" );
+
 			request.Id = id;
+		}
 
 		if ( root.TryGetProperty( "params", out var p ) )
 			request.Params = p;

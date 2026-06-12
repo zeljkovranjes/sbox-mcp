@@ -18,6 +18,8 @@ public class ToolsPage : Widget
 	readonly List<CategoryChip> _chips = new();
 	readonly ScrollArea _scroll;
 
+	int _builtToolCount = -1;
+
 	public ToolsPage( Widget parent ) : base( parent )
 	{
 		Layout = Layout.Column();
@@ -51,17 +53,30 @@ public class ToolsPage : Widget
 		Rebuild();
 	}
 
+	/// <summary>
+	/// The dock restores before McpHost initializes, so the registry is empty
+	/// at construction time - poll until tools appear.
+	/// </summary>
+	public void Tick()
+	{
+		var count = McpHost.Registry?.Tools.Count ?? 0;
+		if ( count == _builtToolCount )
+			return;
+
+		Rebuild();
+	}
+
 	void Rebuild()
 	{
+		_builtToolCount = McpHost.Registry?.Tools.Count ?? 0;
+
 		var canvas = _scroll.Canvas;
 		canvas.Layout.Clear( true );
 
 		var query = _search.Text;
 		var enabled = _chips.Where( c => c.Toggled ).Select( c => c.Category ).ToHashSet();
 
-		var tools = (McpHost.Server is null
-				? Enumerable.Empty<RegisteredTool>()
-				: ToolsOf( McpHost.Server ))
+		var tools = (McpHost.Registry?.Tools ?? (IReadOnlyList<RegisteredTool>)Array.Empty<RegisteredTool>())
 			.Where( t => enabled.Contains( t.Meta.Category ) )
 			.Where( t => string.IsNullOrWhiteSpace( query )
 				|| t.Meta.Name.Contains( query, StringComparison.OrdinalIgnoreCase )
@@ -76,8 +91,6 @@ public class ToolsPage : Widget
 
 		canvas.Layout.AddStretchCell();
 	}
-
-	static IEnumerable<RegisteredTool> ToolsOf( Server.McpServer server ) => McpHost.Registry?.Tools ?? Enumerable.Empty<RegisteredTool>();
 }
 
 /// <summary>

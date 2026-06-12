@@ -32,7 +32,12 @@ public static class GameObjectTools
 			go.WorldPosition = ToVector3( position, "position" );
 
 		if ( rotation is not null )
+		{
+			if ( rotation.Length != 3 )
+				throw new ArgumentException( "'rotation' must be [pitch, yaw, roll]" );
+
 			go.WorldRotation = Rotation.From( rotation[0], rotation[1], rotation[2] );
+		}
 
 		if ( scale is not null )
 			go.LocalScale = ToVector3( scale, "scale" );
@@ -166,6 +171,7 @@ public static class GameObjectTools
 		var scene = RequireScene();
 
 		var results = scene.GetAllObjects( false )
+			.Where( o => o is not Scene )
 			.Where( o => query is null || o.Name.Contains( query, StringComparison.OrdinalIgnoreCase ) )
 			.Where( o => componentType is null || o.Components.GetAll<Component>( FindMode.EverythingInSelf )
 				.Any( c => string.Equals( c.GetType().Name, componentType, StringComparison.OrdinalIgnoreCase )

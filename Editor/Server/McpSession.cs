@@ -7,15 +7,18 @@ namespace SboxMcp.Server;
 /// </summary>
 public sealed class McpSession
 {
+	int _callCount;
+	long _lastSeenTicks = DateTime.Now.Ticks;
+
 	public string Id { get; } = Guid.NewGuid().ToString( "N" );
 	public string ClientName { get; internal set; } = "unknown";
 	public DateTime ConnectedAt { get; } = DateTime.Now;
-	public DateTime LastSeen { get; internal set; } = DateTime.Now;
-	public int CallCount { get; internal set; }
+	public DateTime LastSeen => new( System.Threading.Interlocked.Read( ref _lastSeenTicks ) );
+	public int CallCount => _callCount;
 
 	internal void Touch()
 	{
-		LastSeen = DateTime.Now;
-		CallCount++;
+		System.Threading.Interlocked.Exchange( ref _lastSeenTicks, DateTime.Now.Ticks );
+		System.Threading.Interlocked.Increment( ref _callCount );
 	}
 }

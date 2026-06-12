@@ -18,9 +18,14 @@ public static class ModelDocTools
 		var meshAsset = AssetSystem.FindByPath( meshAssetPath )
 			?? throw new InvalidOperationException( $"No mesh asset at '{meshAssetPath}' - use asset_search" );
 
-		var absolute = outputVmdlPath is null
-			? Path.ChangeExtension( meshAsset.GetSourceFile( true ), ".vmdl" )
-			: ResolveInProject( outputVmdlPath );
+		var meshSource = meshAsset.GetSourceFile( true );
+
+		var absolute = outputVmdlPath is not null
+			? ResolveNewAssetPath( outputVmdlPath )
+			: meshSource is not null
+				? Path.ChangeExtension( meshSource, ".vmdl" )
+				: throw new InvalidOperationException(
+					$"'{meshAssetPath}' has no local source file - pass outputVmdlPath explicitly" );
 
 		if ( File.Exists( absolute ) )
 			throw new InvalidOperationException( $"'{absolute}' already exists - delete it first or pick another path" );
@@ -130,7 +135,7 @@ public static class ModelDocTools
 			path = asset.Path,
 			added = nodeClass,
 			compiled = asset.IsCompiled,
-			note = asset.IsCompiled ? null : "compile failed - read the file with modeldoc_get raw=true and fix it, or scene_undo"
+			note = asset.IsCompiled ? null : "compile failed - read the file with modeldoc_get raw=true and fix it with modeldoc_set"
 		};
 	}
 

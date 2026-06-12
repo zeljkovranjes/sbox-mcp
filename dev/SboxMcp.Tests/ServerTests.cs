@@ -72,12 +72,12 @@ public class ServerTests : IDisposable
 	public async Task Initialize_negotiates_version_and_issues_session()
 	{
 		var (response, body) = await Post(
-			"""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test-client","version":"1"}}}""" );
+			"""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":"test-client","version":"1"}}}""" );
 
 		Assert.Equal( HttpStatusCode.OK, response.StatusCode );
 		Assert.True( response.Headers.Contains( "Mcp-Session-Id" ) );
 		var result = body.GetProperty( "result" );
-		Assert.Equal( "2025-03-26", result.GetProperty( "protocolVersion" ).GetString() );
+		Assert.Equal( "2025-06-18", result.GetProperty( "protocolVersion" ).GetString() );
 		Assert.Equal( "sbox-mcp", result.GetProperty( "serverInfo" ).GetProperty( "name" ).GetString() );
 		Assert.Single( _server.Sessions );
 		Assert.Equal( "test-client", _server.Sessions.First().ClientName );

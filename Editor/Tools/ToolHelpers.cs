@@ -33,6 +33,7 @@ internal static class ToolHelpers
 		}
 
 		var matches = scene.GetAllObjects( false )
+			.Where( o => o is not Scene )
 			.Where( o => string.Equals( o.Name, idOrName, StringComparison.OrdinalIgnoreCase ) )
 			.ToList();
 
@@ -60,7 +61,9 @@ internal static class ToolHelpers
 
 	public static TypeDescription FindComponentType( string typeName )
 	{
-		var all = EditorTypeLibrary.GetTypes<Component>().Where( t => !t.IsAbstract ).ToList();
+		var all = EditorTypeLibrary.GetTypes<Component>()
+			.Where( t => !t.IsAbstract && !t.IsGenericType )
+			.ToList();
 
 		var match = all.FirstOrDefault( t => string.Equals( t.FullName, typeName, StringComparison.OrdinalIgnoreCase ) )
 			?? all.FirstOrDefault( t => string.Equals( t.Name, typeName, StringComparison.OrdinalIgnoreCase ) );

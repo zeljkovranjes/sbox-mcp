@@ -20,6 +20,11 @@ public static class MainThreadDispatcher
 
 		Queue.Enqueue( () =>
 		{
+			// the timeout may already have failed this task - never run stale
+			// work, or a client that retried gets the side effect twice
+			if ( tcs.Task.IsCompleted )
+				return;
+
 			try
 			{
 				tcs.TrySetResult( work() );

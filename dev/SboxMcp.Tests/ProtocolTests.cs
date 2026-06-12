@@ -78,9 +78,17 @@ public class ProtocolTests
 	[Fact]
 	public void Version_negotiation()
 	{
-		Assert.Equal( "2025-03-26", McpVersion.Negotiate( "2025-03-26" ) );
-		Assert.Equal( "2025-06-18", McpVersion.Negotiate( "1999-01-01" ) );
+		// only 2025-06-18 is supported (older revisions require JSON-RPC batching)
+		Assert.Equal( "2025-06-18", McpVersion.Negotiate( "2025-06-18" ) );
+		Assert.Equal( "2025-06-18", McpVersion.Negotiate( "2025-03-26" ) );
 		Assert.Equal( "2025-06-18", McpVersion.Negotiate( null ) );
+	}
+
+	[Fact]
+	public void Null_id_is_rejected()
+	{
+		Assert.Throws<JsonRpcParseException>( () =>
+			JsonRpcRequest.Parse( """{"jsonrpc":"2.0","id":null,"method":"ping"}""" ) );
 	}
 
 	[Fact]

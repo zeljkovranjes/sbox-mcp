@@ -162,9 +162,9 @@ public class AutoStartButton : Widget
 		Paint.SetBrush( on ? accent.WithAlpha( 0.4f ) : Color.White.WithAlpha( 0.08f ) );
 		Paint.DrawRect( track, 8 );
 
-		// knob
+		// knob (DrawCircle takes the diameter)
 		Paint.SetBrush( accent );
-		Paint.DrawCircle( new Vector2( on ? track.Right - 8 : track.Left + 8, track.Center.y ), 6 );
+		Paint.DrawCircle( new Vector2( on ? track.Right - 8 : track.Left + 8, track.Center.y ), 12 );
 
 		Paint.SetPen( Palette.TextDim );
 		Paint.SetDefaultFont( 8 );

@@ -65,13 +65,13 @@ public class GradientHeader : Widget
 		Paint.SetBrush( Color.Black.WithAlpha( 0.35f ) );
 		Paint.DrawRect( pill, 12 );
 
-		// glowing dot
+		// glowing dot (DrawCircle's second arg is the diameter)
 		var dot = new Vector2( pill.Left + 13, pill.Center.y );
 		var glow = 4f + Pulse * 3f;
 		Paint.SetBrush( StatusColor.WithAlpha( 0.25f ) );
 		Paint.DrawCircle( dot, glow * 2 );
 		Paint.SetBrush( StatusColor );
-		Paint.DrawCircle( dot, 4f );
+		Paint.DrawCircle( dot, 8f );
 
 		Paint.SetPen( Color.White );
 		Paint.DrawText( new Rect( pill.Left + 24, pill.Top, pill.Width - 28, pill.Height ), label, TextFlag.LeftCenter );
@@ -236,8 +236,11 @@ public class CodeSnippet : Widget
 			y += 14;
 		}
 
-		// copy affordance
+		// copy affordance; keep repainting while the flash is visible so it
+		// actually expires (nothing else schedules a repaint)
 		var justCopied = _copiedFlash < 1.2f;
+		if ( justCopied )
+			Update();
 		Paint.SetPen( justCopied ? Palette.Running : (Paint.HasMouseOver ? Palette.TextBright : Palette.TextDim) );
 
 		if ( justCopied )
@@ -338,7 +341,7 @@ public class TabButton : Widget
 			var b = new Rect( LocalRect.Right - 16, LocalRect.Top + 6, 14, 14 );
 			Paint.ClearPen();
 			Paint.SetBrush( Palette.Warning );
-			Paint.DrawCircle( b.Center, 7 );
+			Paint.DrawCircle( b.Center, 14 );
 			Paint.SetPen( Color.Black );
 			Paint.SetDefaultFont( 7, 700 );
 			Paint.DrawText( b, Badge > 9 ? "9" : Badge.ToString(), TextFlag.Center );

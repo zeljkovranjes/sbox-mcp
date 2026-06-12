@@ -47,8 +47,12 @@ public static class McpResults
 
 public static class McpVersion
 {
-	/// <summary>Protocol revisions this server understands, newest first.</summary>
-	public static readonly string[] Supported = { "2025-06-18", "2025-03-26", "2024-11-05" };
+	/// <summary>
+	/// Protocol revisions this server understands. 2025-06-18 only: older
+	/// revisions REQUIRE JSON-RPC batch support, which this server does not
+	/// implement, so advertising them would be a lie.
+	/// </summary>
+	public static readonly string[] Supported = { "2025-06-18" };
 
 	/// <summary>Exact match wins; anything else gets our newest revision.</summary>
 	public static string Negotiate( string clientRequested ) =>

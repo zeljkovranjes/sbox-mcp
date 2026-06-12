@@ -41,7 +41,9 @@ public static class ComponentTools
 
 		using var undo = session.UndoScope( $"MCP: add {typeDesc.Name}" ).WithComponentCreations().Push();
 
-		var component = go.Components.Create( typeDesc );
+		var component = go.Components.Create( typeDesc )
+			?? throw new InvalidOperationException( $"'{typeDesc.Name}' could not be instantiated as a component" );
+
 		return new { added = component.GetType().Name, to = go.Name, properties = component.Serialize() };
 	}
 
@@ -94,13 +96,18 @@ public static class ComponentTools
 			throw new InvalidOperationException( $"Component '{type}' did not serialize to an object" );
 
 		var key = node.Select( kv => kv.Key )
-			.FirstOrDefault( k => string.Equals( k, property, StringComparison.OrdinalIgnoreCase ) ) ?? property;
+			.FirstOrDefault( k => string.Equals( k, property, StringComparison.OrdinalIgnoreCase ) )
+			?? throw new InvalidOperationException(
+				$"Component '{component.GetType().Name}' has no property '{property}'. Available: "
+				+ string.Join( ", ", node.Select( kv => kv.Key ).Where( k => !k.StartsWith( "__" ) ) ) );
 
 		using var undo = session.UndoScope( $"MCP: set {key}" )
 			.WithComponentChanges( new[] { component } ).Push();
 
-		node[key] = JsonNode.Parse( value.GetRawText() );
-		component.Deserialize( node );
+		node[key] = value.ValueKind == JsonValueKind.Null ? null : JsonNode.Parse( value.GetRawText() );
+
+		// Deserialize() only queues the data - DeserializeImmediately applies it now
+		component.DeserializeImmediately( node );
 
 		return new { set = key, on = component.GetType().Name, now = component.Serialize() };
 	}

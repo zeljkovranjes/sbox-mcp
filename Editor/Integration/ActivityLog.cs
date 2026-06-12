@@ -25,7 +25,11 @@ public static class ActivityLog
 
 	static readonly LinkedList<ActivityRecord> _records = new();
 
-	/// <summary>Raised on the editor main thread after a record is added.</summary>
+	/// <summary>
+	/// Raised on whatever thread recorded the call - usually a threadpool
+	/// thread. Do NOT touch editor UI from a subscriber; poll Version from
+	/// the frame tick instead (that is what the dock does).
+	/// </summary>
 	public static event Action<ActivityRecord> Added;
 	public static event Action Cleared;
 

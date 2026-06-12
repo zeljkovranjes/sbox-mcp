@@ -41,8 +41,10 @@ public sealed class RegisteredTool
 		{
 			var p = parameters[i];
 
+			// JsonElement params accept explicit null (e.g. to clear a reference
+			// property); for typed params null falls through to the default
 			if ( args is { ValueKind: JsonValueKind.Object } a && a.TryGetProperty( p.Name, out var value )
-				&& value.ValueKind != JsonValueKind.Null )
+				&& (value.ValueKind != JsonValueKind.Null || p.ParameterType == typeof( JsonElement )) )
 			{
 				try
 				{

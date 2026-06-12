@@ -160,7 +160,7 @@ public sealed class McpServer : IDisposable
 			return true;
 
 		return Uri.TryCreate( origin, UriKind.Absolute, out var uri )
-			&& (uri.Host == "localhost" || uri.Host == "127.0.0.1" || uri.Host == "[::1]");
+			&& (uri.IsLoopback || uri.Host == "localhost");
 	}
 
 	async Task HandlePost( HttpListenerContext context )
@@ -203,6 +203,18 @@ public sealed class McpServer : IDisposable
 			session.Touch();
 	}
 
+	/// <summary>
+	/// Clients rarely send DELETE; drop sessions idle for over 30 minutes so
+	/// the list doesn't grow forever in a long editor session.
+	/// </summary>
+	void PruneStaleSessions()
+	{
+		var cutoff = DateTime.Now - TimeSpan.FromMinutes( 30 );
+
+		foreach ( var stale in _sessions.Values.Where( s => s.LastSeen < cutoff ).ToArray() )
+			_sessions.TryRemove( stale.Id, out _ );
+	}
+
 	async Task<(int Status, string Json, string NewSessionId)> Dispatch( JsonRpcRequest rpc )
 	{
 		switch ( rpc.Method )
@@ -215,13 +227,16 @@ public sealed class McpServer : IDisposable
 				var session = new McpSession();
 				if ( rpc.Params is { ValueKind: JsonValueKind.Object } pi
 					&& pi.TryGetProperty( "clientInfo", out var ci )
-					&& ci.TryGetProperty( "name", out var name ) )
+					&& ci.ValueKind == JsonValueKind.Object
+					&& ci.TryGetProperty( "name", out var name )
+					&& name.ValueKind == JsonValueKind.String )
 				{
 					session.ClientName = name.GetString();
 				}
 
 				session.Touch();
 				_sessions[session.Id] = session;
+				PruneStaleSessions();
 				StateChanged?.Invoke();
 
 				return (200, JsonRpcWriter.Result( rpc.Id, McpResults.Initialize( McpVersion.Negotiate( requested ) ) ), session.Id);

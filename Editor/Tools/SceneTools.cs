@@ -18,7 +18,7 @@ public static class SceneTools
 			name = scene.Name,
 			isPlaying = session.IsPlaying,
 			hasUnsavedChanges = session.HasUnsavedChanges,
-			objectCount = scene.GetAllObjects( false ).Count(),
+			objectCount = scene.GetAllObjects( false ).Count( o => o is not Sandbox.Scene ),
 			selection = session.Selection.OfType<Sandbox.GameObject>().Select( o => new { id = o.Id, name = o.Name } ).ToArray()
 		};
 	}

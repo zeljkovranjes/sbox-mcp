@@ -35,7 +35,16 @@ public static class McpHost
 		if ( !_initialized )
 		{
 			_initialized = true;
-			Initialize();
+
+			try
+			{
+				Initialize();
+			}
+			catch ( Exception e )
+			{
+				LastError = $"MCP failed to initialize: {e.Message}";
+				Log.Warning( e, LastError );
+			}
 		}
 
 		MainThreadDispatcher.Pump();
@@ -49,6 +58,8 @@ public static class McpHost
 			try { oldStop(); }
 			catch ( Exception e ) { Log.Warning( $"Failed to stop previous MCP server: {e.Message}" ); }
 		}
+
+		McpSettings.LoadFromCookies();
 
 		var registry = new ToolRegistry();
 		registry.AddAssembly( typeof( McpHost ).Assembly );
@@ -74,6 +85,13 @@ public static class McpHost
 
 	public static void Start()
 	{
+		if ( Server is null )
+		{
+			LastError ??= "MCP server is not initialized";
+			Changed?.Invoke();
+			return;
+		}
+
 		try
 		{
 			Server.Start( McpSettings.Port );
@@ -128,7 +146,15 @@ public static class McpHost
 		var sw = Stopwatch.StartNew();
 		try
 		{
-			var result = await MainThreadDispatcher.Run( () => tool.Invoke( args ) );
+			var result = await MainThreadDispatcher.Run( () =>
+			{
+				// editor operations expect the edited scene to be the active
+				// scene scope (the engine's own cut/paste/clone paths do this)
+				var scene = SceneEditorSession.Active?.Scene;
+				using var sceneScope = scene?.Push();
+
+				return tool.Invoke( args );
+			} );
 
 			ActivityLog.Record( new ActivityRecord
 			{

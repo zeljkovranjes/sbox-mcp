@@ -17,12 +17,15 @@ public class McpDock : Widget
 	readonly Widget[] _pages;
 	readonly OverviewPage _overview;
 	readonly ActivityPage _activity;
+	readonly ToolsPage _tools;
 
 	int _active;
 
+	// Widget.MinimumWidth is a no-op for docks; Qt asks this instead
+	protected override Vector2 MinimumSizeHint() => new( 360, 220 );
+
 	public McpDock( Widget parent ) : base( parent )
 	{
-		MinimumWidth = 360;
 		Layout = Layout.Column();
 
 		_header = Layout.Add( new GradientHeader( this ) );
@@ -53,22 +56,17 @@ public class McpDock : Widget
 
 		_overview = new OverviewPage( content );
 		_activity = new ActivityPage( content );
-		var tools = new ToolsPage( content );
+		_tools = new ToolsPage( content );
 		var settings = new SettingsPage( content );
 
-		_pages = new Widget[] { _overview, _activity, tools, settings };
+		_pages = new Widget[] { _overview, _activity, _tools, settings };
 
 		foreach ( var page in _pages )
 			content.Layout.Add( page, 1 );
 
 		SetActive( 0 );
-		EditorEvent.Register( this );
-	}
-
-	public override void OnDestroyed()
-	{
-		base.OnDestroyed();
-		EditorEvent.Unregister( this );
+		// no EditorEvent.Register(this) - QObject already registers every
+		// widget; doing it again would run Tick twice per frame
 	}
 
 	void SetActive( int index )
@@ -110,5 +108,6 @@ public class McpDock : Widget
 
 		_overview.Tick();
 		_activity.Tick();
+		_tools.Tick();
 	}
 }

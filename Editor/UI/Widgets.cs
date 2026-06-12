@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Editor;
 using Sandbox;
 using SboxMcp.Registry;
@@ -6,9 +7,9 @@ using SboxMcp.Registry;
 namespace SboxMcp.UI;
 
 /// <summary>
-/// Gradient banner with the product mark and a live status pill.
+/// Flat title bar in the native editor style, with a live status chip.
 /// </summary>
-public class GradientHeader : Widget
+public class HeaderBar : Widget
 {
 	public string Title = "s&box MCP";
 	public string Subtitle = "Model Context Protocol server";
@@ -17,9 +18,9 @@ public class GradientHeader : Widget
 	public Color StatusColor = Palette.Stopped;
 	public float Pulse; // 0..1, driven by the dock's frame tick
 
-	public GradientHeader( Widget parent ) : base( parent )
+	public HeaderBar( Widget parent ) : base( parent )
 	{
-		FixedHeight = 64;
+		FixedHeight = 44;
 	}
 
 	protected override void OnPaint()
@@ -28,58 +29,41 @@ public class GradientHeader : Widget
 		Paint.TextAntialiasing = true;
 		Paint.ClearPen();
 
-		// three-stop gradient as two joined linear fills
-		var left = LocalRect;
-		left.Width *= 0.5f;
-		var right = LocalRect;
-		right.Left = left.Right;
-
-		Paint.SetBrushLinear( left.TopLeft, left.TopRight, Palette.GradientA, Palette.GradientB );
-		Paint.DrawRect( left );
-		Paint.SetBrushLinear( right.TopLeft, right.TopRight, Palette.GradientB, Palette.GradientC );
-		Paint.DrawRect( right );
-
-		// subtle dark veil at the bottom for depth
-		Paint.SetBrushLinear( LocalRect.TopLeft, LocalRect.BottomLeft,
-			Color.Transparent, Color.Black.WithAlpha( 0.25f ) );
+		Paint.SetBrush( Palette.CardBackground );
 		Paint.DrawRect( LocalRect );
 
-		// title + subtitle
-		var textRect = LocalRect.Shrink( 16, 10 );
-		Paint.SetPen( Color.White );
-		Paint.SetDefaultFont( 13, 700 );
+		var textRect = LocalRect.Shrink( 12, 6 );
+		Paint.SetPen( Palette.TextBright );
+		Paint.SetDefaultFont( 10, 700 );
 		Paint.DrawText( textRect, Title, TextFlag.LeftTop );
 
-		Paint.SetPen( Color.White.WithAlpha( 0.75f ) );
-		Paint.SetDefaultFont( 8 );
+		Paint.SetPen( Palette.TextDim );
+		Paint.SetDefaultFont( 7 );
 		Paint.DrawText( textRect, Subtitle, TextFlag.LeftBottom );
 
-		// status pill, right-aligned
-		Paint.SetDefaultFont( 8, 600 );
+		// status chip: tone pill at 18% alpha with a glowing dot, tone text
+		Paint.SetDefaultFont( 7, 600 );
 		var label = StatusText;
-		var textSize = Paint.MeasureText( label );
-		var pillWidth = textSize.x + 34;
-		var pill = new Rect( LocalRect.Right - pillWidth - 16, LocalRect.Center.y - 12, pillWidth, 24 );
+		var width = Paint.MeasureText( label ).x + 30;
+		var pill = new Rect( LocalRect.Right - width - 12, LocalRect.Center.y - 10, width, 20 );
 
 		Paint.ClearPen();
-		Paint.SetBrush( Color.Black.WithAlpha( 0.35f ) );
-		Paint.DrawRect( pill, 12 );
+		Paint.SetBrush( StatusColor.WithAlpha( 0.18f ) );
+		Paint.DrawRect( pill, 10 );
 
-		// glowing dot (DrawCircle's second arg is the diameter)
-		var dot = new Vector2( pill.Left + 13, pill.Center.y );
-		var glow = 4f + Pulse * 3f;
-		Paint.SetBrush( StatusColor.WithAlpha( 0.25f ) );
-		Paint.DrawCircle( dot, glow * 2 );
+		var dot = new Vector2( pill.Left + 11, pill.Center.y );
+		Paint.SetBrush( StatusColor.WithAlpha( 0.3f ) );
+		Paint.DrawCircle( dot, 9f + Pulse * 5f );
 		Paint.SetBrush( StatusColor );
-		Paint.DrawCircle( dot, 8f );
+		Paint.DrawCircle( dot, 7f );
 
-		Paint.SetPen( Color.White );
-		Paint.DrawText( new Rect( pill.Left + 24, pill.Top, pill.Width - 28, pill.Height ), label, TextFlag.LeftCenter );
+		Paint.SetPen( StatusColor );
+		Paint.DrawText( new Rect( pill.Left + 20, pill.Top, pill.Width - 24, pill.Height ), label, TextFlag.LeftCenter );
 	}
 }
 
 /// <summary>
-/// Small rounded chip in a category's color.
+/// Small rounded chip in a category's color (Tools page + activity feed).
 /// </summary>
 public class CategoryChip : Widget
 {
@@ -126,74 +110,62 @@ public class CategoryChip : Widget
 }
 
 /// <summary>
-/// Flat rounded button with an accent color, icon and hover lift.
+/// A row of fixed-size widgets that wraps to new lines instead of squashing
+/// when the panel is narrow.
 /// </summary>
-public class ActionButton : Widget
+public class FlowRow : Widget
 {
-	public string Text;
-	public string Icon;
-	public Color Accent = Palette.GradientA;
-	public Action Clicked;
-	public bool Filled = true;
+	readonly List<Widget> _items = new();
 
-	public ActionButton( string text, string icon, Widget parent ) : base( parent )
+	public float Spacing = 4;
+
+	public FlowRow( Widget parent ) : base( parent )
 	{
-		Text = text;
-		Icon = icon;
-		FixedHeight = 28;
-		FixedWidth = 36 + text.Length * 7.5f + (string.IsNullOrEmpty( icon ) ? 0 : 14);
-		Cursor = CursorShape.Finger;
+		HorizontalSizeMode = SizeMode.Flexible;
 	}
 
-	protected override void OnPaint()
+	public T AddItem<T>( T widget ) where T : Widget
 	{
-		Paint.Antialiasing = true;
-		Paint.ClearPen();
-
-		var bg = Filled
-			? Accent.WithAlpha( Paint.HasMouseOver ? 0.95f : 0.8f )
-			: Accent.WithAlpha( Paint.HasMouseOver ? 0.25f : 0.12f );
-
-		Paint.SetBrush( bg );
-		Paint.DrawRect( LocalRect, 6 );
-
-		if ( Paint.HasMouseOver )
-		{
-			Paint.SetPen( Accent.WithAlpha( 0.9f ), 1 );
-			Paint.ClearBrush();
-			Paint.DrawRect( LocalRect.Shrink( 0.5f ), 6 );
-			Paint.ClearPen();
-		}
-
-		var fg = Filled ? Color.White : Accent;
-		var textRect = LocalRect;
-
-		if ( !string.IsNullOrEmpty( Icon ) )
-		{
-			Paint.SetPen( fg );
-			Paint.DrawIcon( new Rect( LocalRect.Left + 8, LocalRect.Top, 16, LocalRect.Height ), Icon, 14, TextFlag.Center );
-			textRect.Left += 22;
-		}
-		else
-		{
-			textRect.Left += 6;
-		}
-
-		Paint.SetPen( fg );
-		Paint.SetDefaultFont( 8, 600 );
-		Paint.DrawText( textRect.Shrink( 4, 0 ), Text, TextFlag.LeftCenter );
+		widget.Parent = this;
+		_items.Add( widget );
+		Arrange();
+		return widget;
 	}
 
-	protected override void OnMouseClick( MouseEvent e )
+	protected override void OnResize()
 	{
-		base.OnMouseClick( e );
-		Clicked?.Invoke();
+		base.OnResize();
+		Arrange();
+	}
+
+	void Arrange()
+	{
+		var available = MathF.Max( Width, 60 );
+		float x = 0, y = 0, rowHeight = 0;
+
+		foreach ( var item in _items )
+		{
+			var w = item.FixedWidth;
+			var h = item.FixedHeight;
+
+			if ( x > 0 && x + w > available )
+			{
+				x = 0;
+				y += rowHeight + Spacing;
+				rowHeight = 0;
+			}
+
+			item.Position = new Vector2( x, y );
+			x += w + Spacing;
+			rowHeight = MathF.Max( rowHeight, h );
+		}
+
+		FixedHeight = y + rowHeight;
 	}
 }
 
 /// <summary>
-/// Dark monospace code block with a one-click copy button that flashes a
-/// confirmation.
+/// Dark monospace code block with a one-click copy that flashes confirmation.
 /// </summary>
 public class CodeSnippet : Widget
 {
@@ -208,7 +180,7 @@ public class CodeSnippet : Widget
 		Accent = accent;
 
 		var lines = code.Split( '\n' ).Length;
-		FixedHeight = 18 + lines * 14 + 10;
+		FixedHeight = lines * 14 + 18; // 9px padding above and below the text
 		Cursor = CursorShape.Finger;
 		ToolTip = "Click to copy";
 	}
@@ -219,14 +191,14 @@ public class CodeSnippet : Widget
 		Paint.ClearPen();
 
 		Paint.SetBrush( Palette.SnippetBackground );
-		Paint.DrawRect( LocalRect, 6 );
+		Paint.DrawRect( LocalRect, 4 );
 
 		// accent edge
 		Paint.SetBrush( Accent );
 		Paint.DrawRect( new Rect( LocalRect.Left, LocalRect.Top + 6, 3, LocalRect.Height - 12 ), 1.5f );
 
 		// code text
-		Paint.SetPen( Paint.HasMouseOver ? Palette.TextBright : (Color)"#C9D1D9" );
+		Paint.SetPen( Paint.HasMouseOver ? Palette.TextBright : Palette.TextDim );
 		Paint.SetFont( "Consolas", 8 );
 
 		var y = LocalRect.Top + 9;
@@ -241,6 +213,7 @@ public class CodeSnippet : Widget
 		var justCopied = _copiedFlash < 1.2f;
 		if ( justCopied )
 			Update();
+
 		Paint.SetPen( justCopied ? Palette.Running : (Paint.HasMouseOver ? Palette.TextBright : Palette.TextDim) );
 
 		if ( justCopied )
@@ -264,7 +237,48 @@ public class CodeSnippet : Widget
 }
 
 /// <summary>
-/// Rounded card container with a painted background.
+/// Titled section box matching the editor's native Group widget (which lives
+/// in the tools addon and is replicated here so the offline compile gate
+/// keeps working): subtle rounded background, icon + title header.
+/// </summary>
+public class GroupBox : Widget
+{
+	public string Title { get; set; } = "";
+	public string Icon { get; set; }
+
+	public GroupBox( Widget parent ) : base( parent )
+	{
+		Layout = Layout.Column();
+		Layout.Margin = new Sandbox.UI.Margin( 14, 30, 14, 12 ); // top clears the header
+		Layout.Spacing = 6;
+	}
+
+	protected override void OnPaint()
+	{
+		Paint.ClearPen();
+		Paint.SetBrush( Theme.ButtonBackground.WithAlpha( 0.1f ) );
+		Paint.DrawRect( LocalRect.Shrink( 0, 1 ), 4.0f );
+		Paint.ClearBrush();
+
+		var headerRect = new Rect( 0, 0, Width, 28 );
+		var left = 14f;
+
+		if ( !string.IsNullOrWhiteSpace( Icon ) )
+		{
+			Paint.SetPen( Theme.Text.WithAlpha( 0.8f ) );
+			Paint.DrawIcon( headerRect.Shrink( left, 0, 0, 0 ), Icon, 18, TextFlag.LeftCenter );
+			left += 24;
+		}
+
+		Paint.SetDefaultFont( 8, 400 );
+		Paint.SetPen( Theme.Text );
+		Paint.DrawText( headerRect.Shrink( left, 0, 0, 0 ), Title, TextFlag.LeftCenter );
+	}
+}
+
+/// <summary>
+/// Rounded container in the editor's control background, optionally with a
+/// tone-colored edge (used for approval cards).
 /// </summary>
 public class Card : Widget
 {
@@ -280,14 +294,13 @@ public class Card : Widget
 	protected override void OnPaint()
 	{
 		Paint.Antialiasing = true;
+		Paint.ClearPen();
 
-		Paint.SetPen( Palette.CardBorder, 1 );
 		Paint.SetBrush( Palette.CardBackground );
-		Paint.DrawRect( LocalRect.Shrink( 0.5f ), 8 );
+		Paint.DrawRect( LocalRect, 4 );
 
 		if ( EdgeAccent is not null )
 		{
-			Paint.ClearPen();
 			Paint.SetBrush( EdgeAccent.Value );
 			Paint.DrawRect( new Rect( LocalRect.Left, LocalRect.Top + 8, 3, LocalRect.Height - 16 ), 1.5f );
 		}
@@ -295,22 +308,21 @@ public class Card : Widget
 }
 
 /// <summary>
-/// One tab in the dock's tab bar, with a colored underline when active.
+/// One tab in the dock's tab bar - neutral editor styling, primary-color
+/// underline when active.
 /// </summary>
 public class TabButton : Widget
 {
 	public string Text;
 	public string Icon;
-	public Color Accent;
 	public bool Active;
 	public Action Clicked;
 	public int Badge;
 
-	public TabButton( string text, string icon, Color accent, Widget parent ) : base( parent )
+	public TabButton( string text, string icon, Widget parent ) : base( parent )
 	{
 		Text = text;
 		Icon = icon;
-		Accent = accent;
 		FixedHeight = 32;
 		FixedWidth = 46 + text.Length * 7f;
 		Cursor = CursorShape.Finger;
@@ -329,10 +341,9 @@ public class TabButton : Widget
 
 		var fg = Active ? Palette.TextBright : Palette.TextDim;
 
-		Paint.SetPen( Active ? Accent : fg );
+		Paint.SetPen( fg );
 		Paint.DrawIcon( new Rect( LocalRect.Left + 8, LocalRect.Top, 16, LocalRect.Height ), Icon, 14, TextFlag.Center );
 
-		Paint.SetPen( fg );
 		Paint.SetDefaultFont( 8, Active ? 700 : 400 );
 		Paint.DrawText( new Rect( LocalRect.Left + 28, LocalRect.Top, LocalRect.Width - 30, LocalRect.Height ), Text, TextFlag.LeftCenter );
 
@@ -350,7 +361,7 @@ public class TabButton : Widget
 		if ( Active )
 		{
 			Paint.ClearPen();
-			Paint.SetBrush( Accent );
+			Paint.SetBrush( Palette.Accent );
 			Paint.DrawRect( new Rect( LocalRect.Left + 6, LocalRect.Bottom - 3, LocalRect.Width - 12, 3 ), 1.5f );
 		}
 	}

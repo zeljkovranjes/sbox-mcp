@@ -29,18 +29,17 @@ public class ToolsPage : Widget
 		_search = Layout.Add( new LineEdit( this ) { PlaceholderText = "Search tools..." } );
 		_search.TextEdited += _ => Rebuild();
 
-		var chipRow = Layout.AddRow();
-		chipRow.Spacing = 4;
+		// FlowRow wraps the chips to new lines on narrow docks instead of
+		// letting them overlap
+		var chipFlow = Layout.Add( new FlowRow( this ) );
 
 		foreach ( var category in Enum.GetValues<ToolCategory>() )
 		{
-			var chip = new CategoryChip( category, this, clickable: true );
+			var chip = new CategoryChip( category, chipFlow, clickable: true );
 			chip.OnToggled = Rebuild;
 			_chips.Add( chip );
-			chipRow.Add( chip );
+			chipFlow.AddItem( chip );
 		}
-
-		chipRow.AddStretchCell();
 
 		_scroll = new ScrollArea( this );
 		_scroll.Canvas = new Widget( _scroll );

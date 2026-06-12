@@ -1,18 +1,38 @@
 using System;
 using Editor;
 using Sandbox;
+using static Sandbox.Internal.GlobalToolsNamespace;
 using SboxMcp.Integration;
 
 namespace SboxMcp.UI;
 
 /// <summary>
-/// The MCP dock: gradient header, colorful tab bar, and the four pages.
-/// Open it from the editor's View menu.
+/// Top-level "MCP" menu in the editor menu bar (lands next to Help).
 /// </summary>
-[Dock( "Editor", "MCP", "hub" )]
+public static class McpMenu
+{
+	[Menu( "Editor", "MCP/Open Dashboard", "hub" )]
+	public static void OpenDashboard() => McpDock.Open();
+
+	[Menu( "Editor", "MCP/Start Server", "play_arrow" )]
+	public static void StartServer() => McpHost.Start();
+
+	[Menu( "Editor", "MCP/Stop Server", "stop" )]
+	public static void StopServer() => McpHost.Stop();
+}
+
+/// <summary>
+/// The MCP dashboard: header with live status, tab bar, and the four pages.
+/// Open it from the MCP menu in the menu bar.
+/// </summary>
 public class McpDock : Widget
 {
-	readonly GradientHeader _header;
+	static McpDock _instance;
+
+	/// <summary>The open dashboard instance, if any.</summary>
+	public static McpDock Instance => _instance.IsValid() ? _instance : null;
+
+	readonly HeaderBar _header;
 	readonly TabButton[] _tabs;
 	readonly Widget[] _pages;
 	readonly OverviewPage _overview;
@@ -24,11 +44,32 @@ public class McpDock : Widget
 	// Widget.MinimumWidth is a no-op for docks; Qt asks this instead
 	protected override Vector2 MinimumSizeHint() => new( 360, 220 );
 
+	/// <summary>Opens (or raises) the dashboard.</summary>
+	public static McpDock Open()
+	{
+		var dock = Instance;
+
+		if ( dock is null )
+		{
+			dock = new McpDock( EditorWindow );
+			EditorWindow.DockManager.AddDock( null, dock, DockArea.Right );
+		}
+
+		EditorWindow.DockManager.RaiseDock( dock );
+		return dock;
+	}
+
 	public McpDock( Widget parent ) : base( parent )
 	{
+		_instance ??= this;
+
+		Name = "McpDock";
+		WindowTitle = "MCP";
+		SetWindowIcon( "hub" );
+
 		Layout = Layout.Column();
 
-		_header = Layout.Add( new GradientHeader( this ) );
+		_header = Layout.Add( new HeaderBar( this ) );
 
 		var tabRow = Layout.AddRow();
 		tabRow.Margin = new Sandbox.UI.Margin( 8, 4, 8, 0 );
@@ -36,10 +77,10 @@ public class McpDock : Widget
 
 		_tabs = new[]
 		{
-			new TabButton( "Overview", "dashboard", Palette.GradientA, this ),
-			new TabButton( "Activity", "bolt", Palette.GradientC, this ),
-			new TabButton( "Tools", "construction", Palette.For( Registry.ToolCategory.ShaderGraph ), this ),
-			new TabButton( "Settings", "tune", Palette.Warning, this )
+			new TabButton( "Overview", "dashboard", this ),
+			new TabButton( "Activity", "bolt", this ),
+			new TabButton( "Tools", "construction", this ),
+			new TabButton( "Settings", "tune", this )
 		};
 
 		for ( var i = 0; i < _tabs.Length; i++ )
@@ -67,6 +108,13 @@ public class McpDock : Widget
 		SetActive( 0 );
 		// no EditorEvent.Register(this) - QObject already registers every
 		// widget; doing it again would run Tick twice per frame
+	}
+
+	public override void OnDestroyed()
+	{
+		base.OnDestroyed();
+		if ( _instance == this )
+			_instance = null;
 	}
 
 	void SetActive( int index )

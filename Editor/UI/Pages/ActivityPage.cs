@@ -21,8 +21,8 @@ public class ActivityPage : Widget
 		_scroll = new ScrollArea( this );
 		_scroll.Canvas = new Widget( _scroll );
 		_scroll.Canvas.Layout = Layout.Column();
-		_scroll.Canvas.Layout.Margin = 12;
-		_scroll.Canvas.Layout.Spacing = 6;
+		_scroll.Canvas.Layout.Margin = 8;
+		_scroll.Canvas.Layout.Spacing = 4;
 		_scroll.Canvas.VerticalSizeMode = SizeMode.CanGrow;
 		_scroll.Canvas.HorizontalSizeMode = SizeMode.Flexible;
 
@@ -48,22 +48,27 @@ public class ActivityPage : Widget
 		// ---- pending approvals -------------------------------------------
 		foreach ( var request in PermissionGate.Pending )
 		{
-			var card = canvas.Layout.Add( new Card( canvas ) { EdgeAccent = Palette.Warning } );
+			var card = canvas.Layout.Add( new Card( canvas ) { EdgeAccent = Theme.Yellow } );
 
 			var title = card.Layout.Add( new Label( $"Approve  {request.ToolName} ?", card ) );
-			title.SetStyles( $"color: {Palette.Warning.Hex}; font-size: 12px; font-weight: 700;" );
+			title.SetStyles( $"color: {Theme.Yellow.Hex}; font-size: 12px; font-weight: 700;" );
 
 			if ( !string.IsNullOrEmpty( request.ArgsSummary ) )
 			{
 				var args = card.Layout.Add( new Label( request.ArgsSummary, card ) );
-				args.SetStyles( $"color: {Palette.TextDim.Hex}; font-size: 10px; font-family: Consolas;" );
+				args.SetStyles( $"color: {Theme.TextLight.Hex}; font-size: 10px; font-family: Consolas;" );
 				args.WordWrap = true;
 			}
 
 			var buttons = card.Layout.AddRow();
 			buttons.Spacing = 6;
-			buttons.Add( new ActionButton( "Approve", "check", card ) { Accent = Palette.Running, Clicked = request.Approve } );
-			buttons.Add( new ActionButton( "Deny", "close", card ) { Accent = Palette.Error, Filled = false, Clicked = request.Deny } );
+
+			var approve = buttons.Add( new Button.Primary( "Approve" ) { Icon = "check", Tint = Theme.Green } );
+			approve.Clicked = request.Approve;
+
+			var deny = buttons.Add( new Button( "Deny", "close" ) );
+			deny.Clicked = request.Deny;
+
 			buttons.AddStretchCell();
 		}
 
@@ -72,9 +77,11 @@ public class ActivityPage : Widget
 		header.Spacing = 6;
 
 		var count = header.Add( new Label( $"{ActivityLog.TotalCalls} total calls", canvas ) );
-		count.SetStyles( $"color: {Palette.TextDim.Hex}; font-size: 11px;" );
+		count.SetStyles( $"color: {Theme.TextLight.Hex}; font-size: 11px;" );
 		header.AddStretchCell();
-		header.Add( new ActionButton( "Clear", "delete_sweep", canvas ) { Accent = Palette.TextDim, Filled = false, Clicked = ActivityLog.Clear } );
+
+		var clear = header.Add( new Button( "Clear", "delete_sweep" ) );
+		clear.Clicked = ActivityLog.Clear;
 
 		// ---- feed ----------------------------------------------------------
 		var records = ActivityLog.Records;
@@ -82,7 +89,7 @@ public class ActivityPage : Widget
 		if ( records.Count == 0 )
 		{
 			var empty = canvas.Layout.Add( new Label( "No tool calls yet. Connect a client and watch the AI work in here.", canvas ) );
-			empty.SetStyles( $"color: {Palette.TextDim.Hex}; font-size: 11px;" );
+			empty.SetStyles( $"color: {Theme.TextLight.Hex}; font-size: 11px;" );
 		}
 
 		foreach ( var record in records.Take( 100 ) )
@@ -93,7 +100,8 @@ public class ActivityPage : Widget
 }
 
 /// <summary>
-/// One painted feed row: category chip, tool name, args, duration, status.
+/// One feed row in the native list style: status icon, colored category chip,
+/// tool name, args, duration.
 /// </summary>
 public class ActivityRow : Widget
 {
@@ -113,21 +121,18 @@ public class ActivityRow : Widget
 
 		var categoryColor = Palette.For( _record.Category );
 
-		if ( Paint.HasMouseOver )
-		{
-			Paint.SetBrush( Color.White.WithAlpha( 0.03f ) );
-			Paint.DrawRect( LocalRect, 5 );
-		}
+		Paint.SetBrush( Paint.HasMouseOver ? Theme.ControlBackground.Lighten( 0.3f ) : Theme.ControlBackground );
+		Paint.DrawRect( LocalRect, 4 );
 
 		// status icon
-		Paint.SetPen( _record.Ok ? Palette.Running : Palette.Error );
-		Paint.DrawIcon( new Rect( LocalRect.Left + 2, LocalRect.Top, 18, LocalRect.Height ), _record.Ok ? "check_circle" : "error", 14, TextFlag.Center );
+		Paint.SetPen( _record.Ok ? Theme.Green : Theme.Red );
+		Paint.DrawIcon( new Rect( LocalRect.Left + 6, LocalRect.Top, 18, LocalRect.Height ), _record.Ok ? "check_circle" : "error", 14, TextFlag.Center );
 
-		// category chip
+		// category chip (stays colorful)
 		var chipText = _record.Category.ToString();
 		Paint.SetDefaultFont( 7, 600 );
 		var chipWidth = Paint.MeasureText( chipText ).x + 12;
-		var chip = new Rect( LocalRect.Left + 24, LocalRect.Center.y - 8, chipWidth, 16 );
+		var chip = new Rect( LocalRect.Left + 28, LocalRect.Center.y - 8, chipWidth, 16 );
 		Paint.ClearPen();
 		Paint.SetBrush( categoryColor.WithAlpha( 0.2f ) );
 		Paint.DrawRect( chip, 8 );

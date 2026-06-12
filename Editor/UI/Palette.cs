@@ -1,30 +1,31 @@
 using System.Collections.Generic;
+using Editor;
 using Sandbox;
 using SboxMcp.Registry;
 
 namespace SboxMcp.UI;
 
 /// <summary>
-/// The visual identity: a category color for every tool family, and the
-/// signature indigo -> violet -> pink gradient.
+/// Visual language: native editor Theme tones for chrome (matching tools like
+/// the Humanoid Retargeter), plus a color per tool category — the Tools page
+/// and activity chips keep their colorful identity.
 /// </summary>
 public static class Palette
 {
-	public static readonly Color GradientA = (Color)"#6366F1"; // indigo
-	public static readonly Color GradientB = (Color)"#8B5CF6"; // violet
-	public static readonly Color GradientC = (Color)"#EC4899"; // pink
+	// native theme tones - chrome follows the editor's look
+	public static Color Running => Theme.Green;
+	public static Color Stopped => Theme.TextLight;
+	public static Color Error => Theme.Red;
+	public static Color Warning => Theme.Yellow;
+	public static Color Info => Theme.Blue;
+	public static Color Accent => Theme.Primary;
 
-	public static readonly Color Running = (Color)"#34D399";
-	public static readonly Color Stopped = (Color)"#9CA3AF";
-	public static readonly Color Error = (Color)"#F87171";
-	public static readonly Color Warning = (Color)"#FBBF24";
+	public static Color CardBackground => Theme.ControlBackground;
+	public static Color TextBright => Theme.Text;
+	public static Color TextDim => Theme.TextLight;
+	public static Color SnippetBackground => Theme.ControlBackground.Darken( 0.35f );
 
-	public static readonly Color CardBackground = (Color)"#1B1D23";
-	public static readonly Color CardBorder = (Color)"#2A2D36";
-	public static readonly Color SnippetBackground = (Color)"#0D1117";
-	public static readonly Color TextBright = (Color)"#F3F4F6";
-	public static readonly Color TextDim = (Color)"#9CA3AF";
-
+	// per-category colors (Tools page + activity feed chips)
 	static readonly Dictionary<ToolCategory, Color> Categories = new()
 	{
 		[ToolCategory.Scene] = (Color)"#4F8DFD",
@@ -43,7 +44,7 @@ public static class Palette
 	public static Color For( ToolCategory category ) =>
 		Categories.TryGetValue( category, out var c ) ? c : TextDim;
 
-	// per-client accents for the config cards
+	// per-client accents for the config snippet edges
 	public static readonly Color ClaudeAccent = (Color)"#D97757";
 	public static readonly Color CursorAccent = (Color)"#7C8AFF";
 	public static readonly Color VsCodeAccent = (Color)"#3EA7FF";

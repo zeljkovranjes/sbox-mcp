@@ -15,58 +15,62 @@ public class SettingsPage : Widget
 	public SettingsPage( Widget parent ) : base( parent )
 	{
 		Layout = Layout.Column();
-		Layout.Margin = 12;
-		Layout.Spacing = 10;
+		Layout.Margin = 8;
+		Layout.Spacing = 8;
 
 		// ---- permission mode ----------------------------------------------
-		var permCard = Layout.Add( new Card( this ) );
-		OverviewPage.AddCardTitle( permCard, "Permissions", "shield" );
+		var permGroup = AddGroup( "Permissions", "shield" );
 
-		var hint = permCard.Layout.Add( new Label(
-			"Controls what connected AI clients may do. Write tools modify your project.", permCard ) );
-		hint.SetStyles( $"color: {Palette.TextDim.Hex}; font-size: 11px;" );
+		var hint = permGroup.Layout.Add( new Label( "Controls what connected AI clients may do. Write tools modify your project.", permGroup ) );
+		hint.SetStyles( $"color: {Theme.TextLight.Hex}; font-size: 11px;" );
 		hint.WordWrap = true;
 
-		var modes = permCard.Layout.AddRow();
+		var modes = permGroup.Layout.AddRow();
 		modes.Spacing = 6;
-		modes.Add( new ModeButton( PermissionMode.FullAccess, "Full access", "bolt", Palette.Error, permCard ) );
-		modes.Add( new ModeButton( PermissionMode.ApproveWrites, "Approve writes", "how_to_reg", Palette.Warning, permCard ) );
-		modes.Add( new ModeButton( PermissionMode.ReadOnly, "Read-only", "visibility", Palette.Running, permCard ) );
+		modes.Add( new ModeButton( PermissionMode.FullAccess, "Full access", "bolt", Theme.Red, permGroup ) );
+		modes.Add( new ModeButton( PermissionMode.ApproveWrites, "Approve writes", "how_to_reg", Theme.Yellow, permGroup ) );
+		modes.Add( new ModeButton( PermissionMode.ReadOnly, "Read-only", "visibility", Theme.Green, permGroup ) );
 		modes.AddStretchCell();
 
 		// ---- server settings ------------------------------------------------
-		var serverCard = Layout.Add( new Card( this ) );
-		OverviewPage.AddCardTitle( serverCard, "Server", "settings_ethernet" );
+		var serverGroup = AddGroup( "Server", "settings_ethernet" );
 
-		var portRow = serverCard.Layout.AddRow();
+		var portRow = serverGroup.Layout.AddRow();
 		portRow.Spacing = 6;
 
-		var portLabel = portRow.Add( new Label( "Port", serverCard ) );
-		portLabel.SetStyles( $"color: {Palette.TextDim.Hex}; font-size: 11px;" );
+		var portLabel = portRow.Add( new Label( "Port", serverGroup ) );
+		portLabel.SetStyles( $"color: {Theme.TextLight.Hex}; font-size: 11px;" );
 
-		_port = portRow.Add( new LineEdit( serverCard ) { Text = McpSettings.Port.ToString() } );
+		_port = portRow.Add( new LineEdit( serverGroup ) { Text = McpSettings.Port.ToString() } );
 		_port.FixedWidth = 80;
 
-		portRow.Add( new ActionButton( "Apply & restart", "save", serverCard )
-		{
-			Accent = Palette.GradientA,
-			Clicked = ApplyPort
-		} );
+		var apply = portRow.Add( new Button.Primary( "Apply & restart" ) { Icon = "save" } );
+		apply.Clicked = ApplyPort;
 		portRow.AddStretchCell();
 
-		serverCard.Layout.Add( new AutoStartButton( serverCard ) );
+		var autoStart = serverGroup.Layout.Add( new Checkbox( "Start server when the editor opens" ) { Value = McpSettings.AutoStart } );
+		autoStart.Clicked = () => McpSettings.AutoStart = autoStart.Value;
 
 		// ---- maintenance ---------------------------------------------------
-		var maintCard = Layout.Add( new Card( this ) );
-		OverviewPage.AddCardTitle( maintCard, "Maintenance", "cleaning_services" );
+		var maintGroup = AddGroup( "Maintenance", "cleaning_services" );
 
-		var maintRow = maintCard.Layout.AddRow();
+		var maintRow = maintGroup.Layout.AddRow();
 		maintRow.Spacing = 6;
-		maintRow.Add( new ActionButton( "Clear activity", "delete_sweep", maintCard ) { Accent = Palette.TextDim, Filled = false, Clicked = ActivityLog.Clear } );
-		maintRow.Add( new ActionButton( "Clear logs", "playlist_remove", maintCard ) { Accent = Palette.TextDim, Filled = false, Clicked = LogCapture.Clear } );
+
+		var clearActivity = maintRow.Add( new Button( "Clear activity", "delete_sweep" ) );
+		clearActivity.Clicked = ActivityLog.Clear;
+
+		var clearLogs = maintRow.Add( new Button( "Clear logs", "playlist_remove" ) );
+		clearLogs.Clicked = LogCapture.Clear;
+
 		maintRow.AddStretchCell();
 
 		Layout.AddStretchCell();
+	}
+
+	GroupBox AddGroup( string title, string icon )
+	{
+		return Layout.Add( new GroupBox( this ) { Title = title, Icon = icon } );
 	}
 
 	void ApplyPort()
@@ -133,49 +137,6 @@ public class ModeButton : Widget
 		base.OnMouseClick( e );
 		McpSettings.Mode = _mode;
 		Parent?.Update();
-		Update();
-	}
-}
-
-/// <summary>
-/// Autostart toggle painted from the live setting.
-/// </summary>
-public class AutoStartButton : Widget
-{
-	public AutoStartButton( Widget parent ) : base( parent )
-	{
-		FixedHeight = 24;
-		FixedWidth = 220;
-		Cursor = CursorShape.Finger;
-	}
-
-	protected override void OnPaint()
-	{
-		Paint.Antialiasing = true;
-		Paint.ClearPen();
-
-		var on = McpSettings.AutoStart;
-		var accent = on ? Palette.Running : Palette.TextDim;
-
-		// toggle track
-		var track = new Rect( LocalRect.Left, LocalRect.Center.y - 8, 30, 16 );
-		Paint.SetBrush( on ? accent.WithAlpha( 0.4f ) : Color.White.WithAlpha( 0.08f ) );
-		Paint.DrawRect( track, 8 );
-
-		// knob (DrawCircle takes the diameter)
-		Paint.SetBrush( accent );
-		Paint.DrawCircle( new Vector2( on ? track.Right - 8 : track.Left + 8, track.Center.y ), 12 );
-
-		Paint.SetPen( Palette.TextDim );
-		Paint.SetDefaultFont( 8 );
-		Paint.DrawText( new Rect( track.Right + 8, LocalRect.Top, LocalRect.Width - 40, LocalRect.Height ),
-			"Start server when the editor opens", TextFlag.LeftCenter );
-	}
-
-	protected override void OnMouseClick( MouseEvent e )
-	{
-		base.OnMouseClick( e );
-		McpSettings.AutoStart = !McpSettings.AutoStart;
 		Update();
 	}
 }

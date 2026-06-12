@@ -21,8 +21,8 @@ public class OverviewPage : Widget
 		_scroll = new ScrollArea( this );
 		_scroll.Canvas = new Widget( _scroll );
 		_scroll.Canvas.Layout = Layout.Column();
-		_scroll.Canvas.Layout.Margin = 12;
-		_scroll.Canvas.Layout.Spacing = 10;
+		_scroll.Canvas.Layout.Margin = 8;
+		_scroll.Canvas.Layout.Spacing = 8;
 		_scroll.Canvas.VerticalSizeMode = SizeMode.CanGrow;
 		_scroll.Canvas.HorizontalSizeMode = SizeMode.Flexible;
 
@@ -42,6 +42,11 @@ public class OverviewPage : Widget
 		Rebuild();
 	}
 
+	GroupBox AddGroup( Widget canvas, string title, string icon )
+	{
+		return canvas.Layout.Add( new GroupBox( canvas ) { Title = title, Icon = icon } );
+	}
+
 	void Rebuild()
 	{
 		var canvas = _scroll.Canvas;
@@ -51,42 +56,42 @@ public class OverviewPage : Widget
 		var url = server?.Url ?? $"http://127.0.0.1:{McpSettings.Port}/sbox-mcp";
 		var running = server?.IsRunning ?? false;
 
-		// ---- server card -------------------------------------------------
-		var card = canvas.Layout.Add( new Card( canvas ) );
-		AddCardTitle( card, "Server", "dns" );
+		// ---- server group -------------------------------------------------
+		var serverGroup = AddGroup( canvas, "Server", "dns" );
 
-		card.Layout.Add( new CodeSnippet( url, running ? Palette.Running : Palette.Stopped, card ) );
+		serverGroup.Layout.Add( new CodeSnippet( url, running ? Palette.Running : Palette.Stopped, serverGroup ) );
 
-		var controls = card.Layout.AddRow();
+		var controls = serverGroup.Layout.AddRow();
 		controls.Spacing = 6;
 
 		if ( running )
 		{
-			controls.Add( new ActionButton( "Stop", "stop", card ) { Accent = Palette.Error, Clicked = McpHost.Stop } );
-			controls.Add( new ActionButton( "Restart", "refresh", card ) { Accent = Palette.GradientA, Filled = false, Clicked = McpHost.Restart } );
+			var stop = controls.Add( new Button.Primary( "Stop" ) { Icon = "stop", Tint = Theme.Red } );
+			stop.Clicked = McpHost.Stop;
+
+			var restart = controls.Add( new Button( "Restart", "refresh" ) );
+			restart.Clicked = McpHost.Restart;
 		}
 		else
 		{
-			controls.Add( new ActionButton( "Start server", "play_arrow", card ) { Accent = Palette.Running, Clicked = McpHost.Start } );
+			var start = controls.Add( new Button.Primary( "Start server" ) { Icon = "play_arrow", Tint = Theme.Green } );
+			start.Clicked = McpHost.Start;
 		}
 
 		controls.AddStretchCell();
 
 		if ( McpHost.LastError is not null )
 		{
-			var error = card.Layout.Add( new Label( McpHost.LastError, card ) );
-			error.SetStyles( $"color: {Palette.Error.Hex}; font-size: 11px;" );
+			var error = serverGroup.Layout.Add( new Label( McpHost.LastError, serverGroup ) );
+			error.SetStyles( $"color: {Theme.Red.Hex}; font-size: 11px;" );
+			error.WordWrap = true;
 
-			card.Layout.Add( new ActionButton( $"Try port {McpSettings.Port + 1}", "swap_horiz", card )
+			var tryPort = serverGroup.Layout.Add( new Button( $"Try port {McpSettings.Port + 1}", "swap_horiz" ) );
+			tryPort.Clicked = () =>
 			{
-				Accent = Palette.Warning,
-				Filled = false,
-				Clicked = () =>
-				{
-					McpSettings.Port += 1;
-					McpHost.Restart();
-				}
-			} );
+				McpSettings.Port += 1;
+				McpHost.Restart();
+			};
 		}
 
 		// ---- sessions ----------------------------------------------------
@@ -97,45 +102,38 @@ public class OverviewPage : Widget
 				? $"{sessions.Count} connected client{(sessions.Count == 1 ? "" : "s")}"
 				: "No clients connected yet - copy a config below into your AI tool";
 
-			var l = card.Layout.Add( new Label( label, card ) );
-			l.SetStyles( $"color: {Palette.TextDim.Hex}; font-size: 11px;" );
+			var l = serverGroup.Layout.Add( new Label( label, serverGroup ) );
+			l.SetStyles( $"color: {Theme.TextLight.Hex}; font-size: 11px;" );
 
 			if ( sessions is not null )
 			{
 				foreach ( var s in sessions )
 				{
-					var row = card.Layout.Add( new Label( $"●  {s.ClientName}   ·   {s.CallCount} calls   ·   last seen {s.LastSeen:HH:mm:ss}", card ) );
-					row.SetStyles( $"color: {Palette.Running.Hex}; font-size: 11px;" );
+					var row = serverGroup.Layout.Add( new Label( $"●  {s.ClientName}   ·   {s.CallCount} calls   ·   last seen {s.LastSeen:HH:mm:ss}", serverGroup ) );
+					row.SetStyles( $"color: {Theme.Green.Hex}; font-size: 11px;" );
 				}
 			}
 		}
 
-		// ---- client config cards ------------------------------------------
-		AddConfigCard( canvas, "Claude Code", Palette.ClaudeAccent,
+		// ---- client config groups ------------------------------------------
+		AddConfigGroup( canvas, "Claude Code", Palette.ClaudeAccent,
 			$"# terminal\nclaude mcp add --transport http sbox {url}\n\n# or .mcp.json\n{{\n  \"mcpServers\": {{\n    \"sbox\": {{ \"type\": \"http\", \"url\": \"{url}\" }}\n  }}\n}}" );
 
-		AddConfigCard( canvas, "Claude Desktop", Palette.ClaudeAccent,
+		AddConfigGroup( canvas, "Claude Desktop", Palette.ClaudeAccent,
 			$"// claude_desktop_config.json (needs Node.js for npx)\n{{\n  \"mcpServers\": {{\n    \"sbox\": {{\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"mcp-remote\", \"{url}\"]\n    }}\n  }}\n}}" );
 
-		AddConfigCard( canvas, "Cursor", Palette.CursorAccent,
+		AddConfigGroup( canvas, "Cursor", Palette.CursorAccent,
 			$"// .cursor/mcp.json\n{{\n  \"mcpServers\": {{\n    \"sbox\": {{ \"url\": \"{url}\" }}\n  }}\n}}" );
 
-		AddConfigCard( canvas, "VS Code", Palette.VsCodeAccent,
+		AddConfigGroup( canvas, "VS Code", Palette.VsCodeAccent,
 			$"// .vscode/mcp.json\n{{\n  \"servers\": {{\n    \"sbox\": {{ \"type\": \"http\", \"url\": \"{url}\" }}\n  }}\n}}" );
 
 		canvas.Layout.AddStretchCell();
 	}
 
-	void AddConfigCard( Widget canvas, string client, Color accent, string snippet )
+	void AddConfigGroup( Widget canvas, string client, Color accent, string snippet )
 	{
-		var card = canvas.Layout.Add( new Card( canvas ) { EdgeAccent = accent } );
-		AddCardTitle( card, client, "integration_instructions" );
-		card.Layout.Add( new CodeSnippet( snippet, accent, card ) );
-	}
-
-	internal static void AddCardTitle( Card card, string text, string icon )
-	{
-		var title = card.Layout.Add( new Label( text, card ) );
-		title.SetStyles( $"color: {Palette.TextBright.Hex}; font-size: 12px; font-weight: 600;" );
+		var group = AddGroup( canvas, client, "integration_instructions" );
+		group.Layout.Add( new CodeSnippet( snippet, accent, group ) );
 	}
 }

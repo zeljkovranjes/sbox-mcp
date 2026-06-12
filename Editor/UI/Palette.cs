@@ -39,7 +39,9 @@ public static class Palette
 		[ToolCategory.ActionGraph] = (Color)"#A3E635",
 		[ToolCategory.Code] = (Color)"#4ADE80",
 		[ToolCategory.Editor] = (Color)"#FACC15",
-		[ToolCategory.Retargeter] = (Color)"#FB7185"
+		[ToolCategory.Retargeter] = (Color)"#FB7185",
+		[ToolCategory.Cloud] = (Color)"#38BDF8",
+		[ToolCategory.Imported] = (Color)"#94A3B8"
 	};
 
 	public static Color For( ToolCategory category ) =>

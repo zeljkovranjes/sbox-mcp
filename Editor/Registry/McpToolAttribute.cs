@@ -15,7 +15,9 @@ public enum ToolCategory
 	ActionGraph,
 	Code,
 	Editor,
-	Retargeter
+	Retargeter,
+	Cloud,
+	Imported
 }
 
 /// <summary>
@@ -38,6 +40,12 @@ public sealed class McpToolAttribute : Attribute
 	/// hidden from clients and shown disabled in the tool browser.
 	/// </summary>
 	public string Requires { get; init; }
+
+	/// <summary>
+	/// Ships disabled; the user must enable it in the tool browser. Used for
+	/// tools with external effects (e.g. downloading cloud assets).
+	/// </summary>
+	public bool DisabledByDefault { get; init; }
 
 	public McpToolAttribute( string name, string description, ToolCategory category )
 	{

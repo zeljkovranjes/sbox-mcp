@@ -67,9 +67,14 @@ public static class McpHost
 			_ => null
 		};
 
+		ToolRegistry.DisabledResolver = tool =>
+			McpSettings.GetToolDisabledOverride( tool.Meta.Name ) ?? tool.Meta.DisabledByDefault;
+
 		var registry = new ToolRegistry();
 		registry.AddAssembly( typeof( McpHost ).Assembly );
 		Registry = registry;
+
+		ToolImporter.RegisterSaved( registry );
 
 		Server = new McpServer( registry, InvokeTool );
 		Server.StateChanged += () => Changed?.Invoke();
@@ -161,6 +166,17 @@ public static class McpHost
 
 				return tool.Invoke( args );
 			} );
+
+			// async tools (cloud downloads etc.) return a Task from the main
+			// thread hop; await its completion here
+			if ( result is Task pending )
+			{
+				await pending;
+				var resultProperty = pending.GetType().GetProperty( "Result" );
+				result = resultProperty?.PropertyType.Name == "VoidTaskResult"
+					? null
+					: resultProperty?.GetValue( pending );
+			}
 
 			ActivityLog.Record( new ActivityRecord
 			{

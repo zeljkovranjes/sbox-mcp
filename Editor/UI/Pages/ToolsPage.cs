@@ -26,8 +26,15 @@ public class ToolsPage : Widget
 		Layout.Margin = 12;
 		Layout.Spacing = 8;
 
-		_search = Layout.Add( new LineEdit( this ) { PlaceholderText = "Search tools..." } );
+		var searchRow = Layout.AddRow();
+		searchRow.Spacing = 6;
+
+		_search = searchRow.Add( new LineEdit( this ) { PlaceholderText = "Search tools..." }, 1 );
 		_search.TextEdited += _ => Rebuild();
+
+		var import = searchRow.Add( new Button( "Import Tools", "library_add" ) );
+		import.ToolTip = "Expose public static methods from other installed libraries as MCP tools";
+		import.Clicked = () => OpenImportMenu( import );
 
 		// FlowRow wraps the chips to new lines on narrow docks instead of
 		// letting them overlap
@@ -96,6 +103,45 @@ public class ToolsPage : Widget
 
 		canvas.Layout.AddStretchCell();
 	}
+
+	/// <summary>
+	/// Dropdown of installed libraries; each opens a submenu of importable
+	/// public static methods with check-toggles.
+	/// </summary>
+	void OpenImportMenu( Widget anchor )
+	{
+		var menu = new Menu( this );
+		var assemblies = ToolImporter.CandidateAssemblies().Take( 24 ).ToList();
+
+		if ( assemblies.Count == 0 )
+		{
+			menu.AddOption( "No importable libraries found", "search_off" ).Enabled = false;
+		}
+
+		foreach ( var assembly in assemblies )
+		{
+			var sub = menu.AddMenu( assembly.GetName().Name, "extension" );
+
+			foreach ( var method in ToolImporter.CandidateMethods( assembly ).Take( 50 ) )
+			{
+				var label = $"{method.DeclaringType?.Name}.{method.Name}({string.Join( ", ", method.GetParameters().Select( p => p.Name ) )})";
+				var option = sub.AddOption( label );
+				option.Checkable = true;
+				option.Checked = ToolImporter.IsImported( method );
+				option.Triggered = () =>
+				{
+					if ( ToolImporter.IsImported( method ) )
+						ToolImporter.Unimport( method );
+					else
+						ToolImporter.Import( method );
+
+					Rebuild();
+				};
+			}
+		}
+
+		menu.OpenAtCursor();
+	}
 }
 
 /// <summary>
@@ -103,13 +149,29 @@ public class ToolsPage : Widget
 /// </summary>
 public class ToolRow : Widget
 {
+	const float ToggleWidth = 40;
+
 	readonly RegisteredTool _tool;
 
 	public ToolRow( RegisteredTool tool, Widget parent ) : base( parent )
 	{
 		_tool = tool;
 		FixedHeight = 40;
-		ToolTip = tool.Meta.Description;
+		ToolTip = tool.Meta.Description + "\n\nClick the toggle to enable/disable this tool.";
+	}
+
+	bool UserDisabled => McpSettings.GetToolDisabledOverride( _tool.Meta.Name ) ?? _tool.Meta.DisabledByDefault;
+
+	protected override void OnMouseClick( MouseEvent e )
+	{
+		base.OnMouseClick( e );
+
+		// the toggle lives in the right strip of the row
+		if ( e.LocalPosition.x < LocalRect.Right - ToggleWidth )
+			return;
+
+		McpSettings.SetToolDisabled( _tool.Meta.Name, !UserDisabled );
+		Update();
 	}
 
 	protected override void OnPaint()
@@ -168,7 +230,13 @@ public class ToolRow : Widget
 		// description
 		Paint.SetPen( disabled ? Palette.TextDim.WithAlpha( 0.5f ) : Palette.TextDim );
 		Paint.SetDefaultFont( 7 );
-		Paint.DrawText( new Rect( LocalRect.Left + 14, LocalRect.Top + 20, LocalRect.Width - 20, 14 ),
+		Paint.DrawText( new Rect( LocalRect.Left + 14, LocalRect.Top + 20, LocalRect.Width - ToggleWidth - 20, 14 ),
 			_tool.Meta.Description, TextFlag.LeftCenter | TextFlag.SingleLine );
+
+		// enable/disable toggle (persisted per tool)
+		var off = UserDisabled;
+		Paint.SetPen( off ? Palette.TextDim : Theme.Green );
+		Paint.DrawIcon( new Rect( LocalRect.Right - ToggleWidth, LocalRect.Top, ToggleWidth - 8, LocalRect.Height ),
+			off ? "toggle_off" : "toggle_on", 22, TextFlag.Center );
 	}
 }

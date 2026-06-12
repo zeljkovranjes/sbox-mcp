@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Editor;
 using Sandbox;
 using SboxMcp.Integration;
@@ -25,12 +25,17 @@ public class SettingsPage : Widget
 		hint.SetStyles( $"color: {Theme.TextLight.Hex}; font-size: 11px;" );
 		hint.WordWrap = true;
 
-		var modes = permGroup.Layout.AddRow();
-		modes.Spacing = 6;
-		modes.Add( new ModeButton( PermissionMode.FullAccess, "Full access", "bolt", Theme.Red, permGroup ) );
-		modes.Add( new ModeButton( PermissionMode.ApproveWrites, "Approve writes", "how_to_reg", Theme.Yellow, permGroup ) );
-		modes.Add( new ModeButton( PermissionMode.ReadOnly, "Read-only", "visibility", Theme.Green, permGroup ) );
-		modes.AddStretchCell();
+		var modeRow = permGroup.Layout.AddRow();
+		modeRow.Spacing = 6;
+
+		var modeCombo = modeRow.Add( new ComboBox( permGroup ) { MinimumWidth = 180 } );
+		modeCombo.AddItem( "Approve writes", "how_to_reg", () => McpSettings.Mode = PermissionMode.ApproveWrites,
+			selected: McpSettings.Mode == PermissionMode.ApproveWrites );
+		modeCombo.AddItem( "Full access", "bolt", () => McpSettings.Mode = PermissionMode.FullAccess,
+			selected: McpSettings.Mode == PermissionMode.FullAccess );
+		modeCombo.AddItem( "Read-only", "visibility", () => McpSettings.Mode = PermissionMode.ReadOnly,
+			selected: McpSettings.Mode == PermissionMode.ReadOnly );
+		modeRow.AddStretchCell();
 
 		// ---- server settings ------------------------------------------------
 		var serverGroup = AddGroup( "Server", "settings_ethernet" );
@@ -84,60 +89,5 @@ public class SettingsPage : Widget
 
 		McpSettings.Port = port;
 		McpHost.Restart();
-	}
-}
-
-/// <summary>
-/// Segmented permission-mode button; paints itself from the live setting.
-/// </summary>
-public class ModeButton : Widget
-{
-	readonly PermissionMode _mode;
-	readonly string _text;
-	readonly string _icon;
-	readonly Color _accent;
-
-	public ModeButton( PermissionMode mode, string text, string icon, Color accent, Widget parent ) : base( parent )
-	{
-		_mode = mode;
-		_text = text;
-		_icon = icon;
-		_accent = accent;
-		FixedHeight = 30;
-		FixedWidth = 46 + text.Length * 7f;
-		Cursor = CursorShape.Finger;
-	}
-
-	protected override void OnPaint()
-	{
-		Paint.Antialiasing = true;
-		Paint.ClearPen();
-
-		var selected = McpSettings.Mode == _mode;
-
-		Paint.SetBrush( selected ? _accent.WithAlpha( 0.22f ) : Color.White.WithAlpha( Paint.HasMouseOver ? 0.06f : 0.02f ) );
-		Paint.DrawRect( LocalRect, 6 );
-
-		if ( selected )
-		{
-			Paint.SetPen( _accent, 1.5f );
-			Paint.ClearBrush();
-			Paint.DrawRect( LocalRect.Shrink( 1 ), 6 );
-			Paint.ClearPen();
-		}
-
-		var fg = selected ? _accent : Palette.TextDim;
-		Paint.SetPen( fg );
-		Paint.DrawIcon( new Rect( LocalRect.Left + 8, LocalRect.Top, 16, LocalRect.Height ), _icon, 13, TextFlag.Center );
-		Paint.SetDefaultFont( 8, selected ? 700 : 400 );
-		Paint.DrawText( new Rect( LocalRect.Left + 28, LocalRect.Top, LocalRect.Width - 32, LocalRect.Height ), _text, TextFlag.LeftCenter );
-	}
-
-	protected override void OnMouseClick( MouseEvent e )
-	{
-		base.OnMouseClick( e );
-		McpSettings.Mode = _mode;
-		Parent?.Update();
-		Update();
 	}
 }

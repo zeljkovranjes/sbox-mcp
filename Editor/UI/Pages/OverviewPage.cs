@@ -74,7 +74,7 @@ public class OverviewPage : Widget
 		}
 		else
 		{
-			var start = controls.Add( new Button.Primary( "Start server" ) { Icon = "play_arrow", Tint = Theme.Green } );
+			var start = controls.Add( new Button.Primary( "Start server" ) { Icon = "play_arrow" } );
 			start.Clicked = McpHost.Start;
 		}
 

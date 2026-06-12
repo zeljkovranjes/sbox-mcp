@@ -31,6 +31,31 @@ public static class PrefabTools
 		return Describe( instance );
 	}
 
+	[McpTool( "prefab_create_from_gameobject", "Turns a GameObject (and its children) into a reusable .prefab asset; the original becomes an instance of it.", ToolCategory.Prefab, Writes = true )]
+	public static object CreateFromGameObject(
+		[Desc( "GameObject id or unique name" )] string gameObject,
+		[Desc( "Output path ending in .prefab, e.g. 'prefabs/door.prefab'" )] string prefabPath )
+	{
+		if ( !prefabPath.EndsWith( ".prefab", StringComparison.OrdinalIgnoreCase ) )
+			throw new ArgumentException( "prefabPath must end in .prefab" );
+
+		var session = RequireSession();
+		var go = FindGameObject( gameObject );
+		var absolute = AssetTools.ResolveNewAssetPath( prefabPath );
+
+		if ( System.IO.File.Exists( absolute ) )
+			throw new InvalidOperationException( $"'{prefabPath}' already exists" );
+
+		System.IO.Directory.CreateDirectory( System.IO.Path.GetDirectoryName( absolute ) );
+
+		using var undo = session.UndoScope( $"MCP: create prefab {prefabPath}" )
+			.WithGameObjectChanges( go, GameObjectUndoFlags.All ).Push();
+
+		EditorUtility.Prefabs.ConvertGameObjectToPrefab( go, absolute );
+
+		return new { created = prefabPath, instanceId = go.Id };
+	}
+
 	[McpTool( "prefab_break_instance", "Unlinks a prefab instance so it becomes plain GameObjects.", ToolCategory.Prefab, Writes = true )]
 	public static object BreakInstance( [Desc( "GameObject id or unique name of the prefab instance root" )] string gameObject )
 	{

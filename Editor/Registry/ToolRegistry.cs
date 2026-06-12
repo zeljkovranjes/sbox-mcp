@@ -19,12 +19,20 @@ public sealed class RegisteredTool
 	public McpToolDescriptor Descriptor { get; }
 
 	/// <summary>
-	/// Why this tool cannot run right now (e.g. "Not Installed"), or null when
-	/// it is available. Evaluated live so integrations installed mid-session
-	/// light up without a restart.
+	/// Why this tool cannot run right now ("Disabled", "Not Installed", ...),
+	/// or null when it is available. Evaluated live so user toggles and
+	/// integrations installed mid-session apply without a restart.
 	/// </summary>
-	public string UnavailableReason =>
-		Meta.Requires is null ? null : ToolRegistry.RequirementResolver?.Invoke( Meta.Requires );
+	public string UnavailableReason
+	{
+		get
+		{
+			if ( ToolRegistry.DisabledResolver?.Invoke( this ) ?? Meta.DisabledByDefault )
+				return "Disabled";
+
+			return Meta.Requires is null ? null : ToolRegistry.RequirementResolver?.Invoke( Meta.Requires );
+		}
+	}
 
 	public bool IsAvailable => UnavailableReason is null;
 
@@ -101,6 +109,12 @@ public sealed class ToolRegistry
 	/// </summary>
 	public static Func<string, string> RequirementResolver { get; set; }
 
+	/// <summary>
+	/// Whether the user has disabled this tool. Null resolver = only
+	/// DisabledByDefault applies.
+	/// </summary>
+	public static Func<RegisteredTool, bool> DisabledResolver { get; set; }
+
 	internal static readonly JsonSerializerOptions BindOptions = new()
 	{
 		PropertyNameCaseInsensitive = true,
@@ -139,6 +153,28 @@ public sealed class ToolRegistry
 	}
 
 	public RegisteredTool Find( string name ) => _byName.GetValueOrDefault( name );
+
+	/// <summary>
+	/// Registers an arbitrary public static method (from another library) as a
+	/// tool. Returns null when the name is already taken.
+	/// </summary>
+	public RegisteredTool AddImported( string name, string description, ToolCategory category, MethodInfo method )
+	{
+		if ( _byName.ContainsKey( name ) )
+			return null;
+
+		var meta = new McpToolAttribute( name, description, category ) { Writes = true };
+		var tool = new RegisteredTool( meta, method );
+		_tools.Add( tool );
+		_byName[name] = tool;
+		return tool;
+	}
+
+	public void Remove( string name )
+	{
+		if ( _byName.Remove( name, out var tool ) )
+			_tools.Remove( tool );
+	}
 
 	/// <summary>
 	/// Converts a tool's return value to the text sent back to the client.

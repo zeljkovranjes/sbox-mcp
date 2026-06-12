@@ -10,8 +10,9 @@ namespace SboxMcp.Tools;
 public static class CodeTools
 {
 	static readonly string[] SkippedDirs = { "\\obj\\", "\\bin\\", "\\.git\\", "/obj/", "/bin/", "/.git/" };
+	static readonly string[] SourceExtensions = { ".cs", ".razor", ".scss", ".shader", ".hlsl" };
 
-	[McpTool( "code_list_files", "Lists C# source files in the project (Code/ and Editor/ folders). Saving a file hot-reloads automatically.", ToolCategory.Code )]
+	[McpTool( "code_list_files", "Lists source files in the project: C# (.cs), UI (.razor/.scss) and shaders. Saving a file hot-reloads automatically.", ToolCategory.Code )]
 	public static object ListFiles(
 		[Desc( "Subdirectory filter relative to project root, e.g. 'Code/Player'" )] string subdir = null,
 		[Desc( "Include files from installed Libraries" )] bool includeLibraries = false )
@@ -22,7 +23,8 @@ public static class CodeTools
 		if ( !Directory.Exists( searchRoot ) )
 			throw new InvalidOperationException( $"No directory '{subdir}' in the project" );
 
-		var files = Directory.EnumerateFiles( searchRoot, "*.cs", SearchOption.AllDirectories )
+		var files = Directory.EnumerateFiles( searchRoot, "*.*", SearchOption.AllDirectories )
+			.Where( f => SourceExtensions.Contains( Path.GetExtension( f ), StringComparer.OrdinalIgnoreCase ) )
 			.Where( f => !SkippedDirs.Any( s => f.Contains( s, StringComparison.OrdinalIgnoreCase ) ) )
 			.Where( f => includeLibraries || !f.Contains( Path.DirectorySeparatorChar + "Libraries" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase ) )
 			.Select( f => Path.GetRelativePath( root, f ).Replace( '\\', '/' ) )
@@ -54,6 +56,21 @@ public static class CodeTools
 		File.WriteAllText( absolute, content );
 
 		return new { written = path, note = "hot-reload triggers automatically; verify with code_get_compile_errors" };
+	}
+
+	[McpTool( "code_run_static_method", "Invokes a public static parameterless method from project code - write a method with code_write_file, wait for hot-reload, then call it to test or inspect game state. Returns the method's ToString'd result.", ToolCategory.Code, Writes = true )]
+	public static object RunStaticMethod(
+		[Desc( "Type name, e.g. 'MyGame.DebugHelpers'" )] string typeName,
+		[Desc( "Public static method with no parameters" )] string methodName )
+	{
+		var type = Sandbox.Internal.GlobalToolsNamespace.EditorTypeLibrary.GetType( typeName )
+			?? throw new InvalidOperationException( $"No type '{typeName}' - is it compiled? Check code_get_compile_errors" );
+
+		var method = type.Methods.FirstOrDefault( m => m.IsStatic && m.Name == methodName && m.Parameters.Length == 0 )
+			?? throw new InvalidOperationException( $"'{typeName}' has no public static parameterless method '{methodName}'" );
+
+		var result = method.InvokeWithReturn<object>( null, Array.Empty<object>() );
+		return new { invoked = $"{typeName}.{methodName}", result = result?.ToString() ?? "null" };
 	}
 
 	[McpTool( "code_get_compile_errors", "Gets recent compiler errors and warnings from the editor console.", ToolCategory.Code )]

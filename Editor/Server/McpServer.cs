@@ -271,8 +271,10 @@ public sealed class McpServer : IDisposable
 			return JsonRpcWriter.Error( rpc.Id, JsonRpcError.InvalidParams, $"Unknown tool '{name}'" );
 
 		if ( tool.UnavailableReason is string reason )
-			return JsonRpcWriter.Error( rpc.Id, JsonRpcError.InvalidParams,
-				$"'{name}' is unavailable: {reason} (requires '{tool.Meta.Requires}')" );
+		{
+			var detail = tool.Meta.Requires is null ? reason : $"{reason} (requires '{tool.Meta.Requires}')";
+			return JsonRpcWriter.Error( rpc.Id, JsonRpcError.InvalidParams, $"'{name}' is unavailable: {detail}" );
+		}
 
 		JsonElement? args = p.TryGetProperty( "arguments", out var a ) && a.ValueKind == JsonValueKind.Object
 			? a : null;

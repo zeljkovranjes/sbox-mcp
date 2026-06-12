@@ -1,11 +1,11 @@
 # s&box MCP
 
-**An MCP server that runs inside the s&box editor.** Connect Claude Code, Claude Desktop, Cursor or VS Code and let AI work the editor for you — scenes, GameObjects, components, prefabs, assets, ModelDoc, AnimGraph, ShaderGraph, ActionGraph, code files, console diagnostics, play mode and screenshots. Around 50 tools, a colorful in-editor dock, and a setup that is exactly two steps.
+**An MCP server that runs inside the s&box editor.** Connect Claude Code, Claude Desktop, Cursor or VS Code and let AI build games in the editor — scenes, GameObjects, components, prefabs, assets, materials, sounds, input actions, cloud content, ModelDoc, AnimGraph, ShaderGraph, ActionGraph, code files (C#/Razor/SCSS), console diagnostics, play mode and screenshots. 70+ tools, an in-editor dashboard, and a setup that is exactly two steps.
 
 ## Setup
 
 1. **Install the library** — in the s&box editor open the Library Manager and install *s&box MCP* (or clone this repo into your project's `Libraries/` folder).
-2. **Copy the config** — open the dock via **View → MCP**, find your AI client's card on the Overview tab and click the snippet to copy it. Paste it into your client's MCP config. Done.
+2. **Copy the config** — open the dashboard via the **MCP menu** in the menu bar, find your AI client's card on the Overview tab and click the snippet to copy it. Paste it into your client's MCP config. Done.
 
 The server starts automatically with the editor and listens on `http://127.0.0.1:9090/sbox-mcp` (port configurable in Settings).
 
@@ -31,12 +31,12 @@ claude mcp add --transport http sbox http://127.0.0.1:9090/sbox-mcp
 { "servers": { "sbox": { "type": "http", "url": "http://127.0.0.1:9090/sbox-mcp" } } }
 ```
 
-## The dock
+## The dashboard
 
 - **Overview** — server status with a live pulse, connected clients, one-click copy config cards.
 - **Activity** — every tool call the AI makes, live: category chip, arguments, duration, result. Approval cards appear here when a write needs your OK.
-- **Tools** — searchable browser of every tool, filterable by category. This is the documentation.
-- **Settings** — port, autostart, and the permission mode.
+- **Tools** — searchable browser of every tool, filterable by category, with a **per-tool enable/disable toggle** (persisted; some tools like cloud downloads ship disabled). **Import Tools** opens a searchable dialog that exposes public static methods from your other installed libraries as MCP tools.
+- **Settings** — port, autostart, and the permission mode dropdown.
 
 ## Permission modes
 
@@ -52,16 +52,21 @@ Every scene mutation runs inside an editor undo scope — anything the AI does, 
 
 | Prefix | What it covers |
 |---|---|
-| `scene_` | Status, hierarchy, save, undo/redo |
+| `scene_` | Create, open, list, save / save-as, status, hierarchy, undo/redo |
 | `gameobject_` | Create, delete, rename, transform, reparent, duplicate, find, details, select |
 | `component_` | Type search, add/remove, get/set properties (any `[Property]`, resources by path) |
-| `prefab_` | Instantiate, break instance, re-sync from prefab |
+| `prefab_` | Create from GameObject, instantiate, break instance, re-sync |
 | `asset_` | Search, info, compile, create resource, raw read/write of any text asset |
+| `material_` / `soundevent_` | Create .vmat materials and .sound events |
+| `cloud_` | Search and install sbox.game content (disabled by default — opt in from the tool browser) |
 | `modeldoc_` | Create .vmdl from FBX/OBJ, read as JSON, write KV3, auto-generate collision |
 | `animgraph_` | Read as JSON, write KV3, list parameters |
 | `shadergraph_` / `actiongraph_` | Read/write the JSON formats, list nodes |
-| `code_` | List/read/write C# files (hot-reload is automatic), compile errors |
+| `input_` / `project_` | List/add/remove input actions, set the startup scene |
+| `code_` | List/read/write C#, Razor, SCSS and shader files (hot-reload is automatic), compile errors, invoke a static method to test |
 | `editor_` | Console logs, screenshots, play/stop, console commands, project info, selection |
+| `retargeter_` | Drives the Humanoid Retargeter library when installed (shown disabled otherwise) |
+| `lib_` | Tools you imported from other libraries via Import Tools |
 
 Notes on graph authoring: `.vmdl` and `.vanmgrph` are KV3 text, ShaderGraph/ActionGraph are JSON. The write tools accept the full on-disk format and compile immediately, so format mistakes surface as compile errors the AI can read and fix. Reading an existing asset first (`*_get` with `raw=true`) is the recommended way for the AI to learn the current schema.
 

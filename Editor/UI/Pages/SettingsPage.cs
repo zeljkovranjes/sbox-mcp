@@ -45,6 +45,7 @@ public class SettingsPage : Widget
 		_port.FixedWidth = 80;
 
 		var apply = portRow.Add( new Button.Primary( "Apply & restart" ) { Icon = "save" } );
+		apply.FixedWidth = 136; // auto-sizing clips the label slightly
 		apply.Clicked = ApplyPort;
 		portRow.AddStretchCell();
 

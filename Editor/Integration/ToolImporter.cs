@@ -28,6 +28,29 @@ public static class ToolImporter
 		"Humanizer", "Azure", "LiteDB", "Fleck", "Zio", "ExCSS", "xunit", "JetBrains"
 	};
 
+	/// <summary>
+	/// True for assemblies compiled from installed s&box libraries (named
+	/// "package.{org}.{ident}[.editor]"), excluding the open project's own code.
+	/// </summary>
+	public static bool IsLibraryAssembly( Assembly assembly )
+	{
+		var name = assembly.GetName().Name ?? "";
+		if ( !name.StartsWith( "package.", StringComparison.OrdinalIgnoreCase ) )
+			return false;
+
+		var config = Sandbox.Project.Current?.Config;
+		if ( config is null )
+			return true;
+
+		return !name.StartsWith( $"package.{config.Org}.{config.Ident}", StringComparison.OrdinalIgnoreCase );
+	}
+
+	public static string FriendlyName( Assembly assembly )
+	{
+		var name = assembly.GetName().Name ?? "?";
+		return name.StartsWith( "package.", StringComparison.OrdinalIgnoreCase ) ? name[8..] : name;
+	}
+
 	/// <summary>Loaded assemblies that look like user libraries with importable methods.</summary>
 	public static IEnumerable<Assembly> CandidateAssemblies()
 	{

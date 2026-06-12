@@ -34,7 +34,7 @@ public class ToolsPage : Widget
 
 		var import = searchRow.Add( new Button( "Import Tools", "library_add" ) );
 		import.ToolTip = "Expose public static methods from other installed libraries as MCP tools";
-		import.Clicked = () => OpenImportMenu( import );
+		import.Clicked = () => new ImportToolsDialog( this ).Show();
 
 		// FlowRow wraps the chips to new lines on narrow docks instead of
 		// letting them overlap
@@ -102,45 +102,6 @@ public class ToolsPage : Widget
 			canvas.Layout.Add( new ToolRow( tool, canvas ) );
 
 		canvas.Layout.AddStretchCell();
-	}
-
-	/// <summary>
-	/// Dropdown of installed libraries; each opens a submenu of importable
-	/// public static methods with check-toggles.
-	/// </summary>
-	void OpenImportMenu( Widget anchor )
-	{
-		var menu = new Menu( this );
-		var assemblies = ToolImporter.CandidateAssemblies().Take( 24 ).ToList();
-
-		if ( assemblies.Count == 0 )
-		{
-			menu.AddOption( "No importable libraries found", "search_off" ).Enabled = false;
-		}
-
-		foreach ( var assembly in assemblies )
-		{
-			var sub = menu.AddMenu( assembly.GetName().Name, "extension" );
-
-			foreach ( var method in ToolImporter.CandidateMethods( assembly ).Take( 50 ) )
-			{
-				var label = $"{method.DeclaringType?.Name}.{method.Name}({string.Join( ", ", method.GetParameters().Select( p => p.Name ) )})";
-				var option = sub.AddOption( label );
-				option.Checkable = true;
-				option.Checked = ToolImporter.IsImported( method );
-				option.Triggered = () =>
-				{
-					if ( ToolImporter.IsImported( method ) )
-						ToolImporter.Unimport( method );
-					else
-						ToolImporter.Import( method );
-
-					Rebuild();
-				};
-			}
-		}
-
-		menu.OpenAtCursor();
 	}
 }
 

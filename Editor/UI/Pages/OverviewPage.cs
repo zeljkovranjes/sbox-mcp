@@ -75,6 +75,7 @@ public class OverviewPage : Widget
 		else
 		{
 			var start = controls.Add( new Button.Primary( "Start server" ) { Icon = "play_arrow" } );
+			start.FixedWidth = 136; // match the settings page's Apply & restart
 			start.Clicked = McpHost.Start;
 		}
 

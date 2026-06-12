@@ -4,6 +4,7 @@ docs/superpowers/
 # Local dev harness + Claude workspace
 dev/
 .claude/
+.mcp.json
 
 # Build artifacts
 bin/

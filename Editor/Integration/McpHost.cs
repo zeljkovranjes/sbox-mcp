@@ -21,6 +21,7 @@ public static class McpHost
 	const string StopSlot = "sbox-mcp.stop";
 
 	static bool _initialized;
+	static Editor.Widget _statusPill;
 
 	public static McpServer Server { get; private set; }
 	public static ToolRegistry Registry { get; private set; }
@@ -80,6 +81,7 @@ public static class McpHost
 		Server.StateChanged += () => Changed?.Invoke();
 
 		LogCapture.Start();
+		InstallStatusPill();
 		AppDomain.CurrentDomain.SetData( StopSlot, (Action)Shutdown );
 
 		Log.Info( $"s&box MCP loaded ({registry.Tools.Count} tools)" );
@@ -88,10 +90,38 @@ public static class McpHost
 			Start();
 	}
 
+	static void InstallStatusPill()
+	{
+		try
+		{
+			_statusPill = new UI.McpStatusPill();
+			Sandbox.Internal.GlobalToolsNamespace.EditorWindow.StatusBar.AddWidgetRight( _statusPill, 0 );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"Could not add the MCP status bar pill: {e.Message}" );
+		}
+	}
+
 	static void Shutdown()
 	{
 		Server?.Stop();
 		LogCapture.Stop();
+
+		// remove the old assembly's status pill so hotloads don't stack them
+		try
+		{
+			if ( _statusPill is not null )
+			{
+				Sandbox.Internal.GlobalToolsNamespace.EditorWindow?.StatusBar?.RemoveWidget( _statusPill );
+				_statusPill.Destroy();
+				_statusPill = null;
+			}
+		}
+		catch
+		{
+			// editor shutting down; nothing to clean
+		}
 	}
 
 	public static void Start()

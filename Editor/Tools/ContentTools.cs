@@ -50,6 +50,35 @@ public static class ContentTools
 		return AssetTools.WriteRaw( path, sb.ToString() );
 	}
 
+	[McpTool( "texture_write", "Saves base64-encoded image bytes (png/jpg/tga) as a texture asset - pipe in generated or downloaded images, then use them in material_create.", ToolCategory.Asset, Writes = true )]
+	public static object TextureWrite(
+		[Desc( "Output path ending in .png/.jpg/.tga, e.g. 'textures/crate_color.png'" )] string path,
+		[Desc( "The image file's bytes, base64-encoded" )] string base64Data )
+	{
+		var extension = Path.GetExtension( path ).ToLowerInvariant();
+		if ( extension is not (".png" or ".jpg" or ".jpeg" or ".tga") )
+			throw new ArgumentException( "path must end in .png, .jpg or .tga" );
+
+		byte[] bytes;
+		try
+		{
+			bytes = Convert.FromBase64String( base64Data );
+		}
+		catch ( FormatException )
+		{
+			throw new ArgumentException( "base64Data is not valid base64" );
+		}
+
+		var absolute = ResolveNewAssetPath( path );
+		Directory.CreateDirectory( Path.GetDirectoryName( absolute ) );
+		File.WriteAllBytes( absolute, bytes );
+
+		var asset = AssetSystem.RegisterFile( absolute );
+		asset?.Compile( true );
+
+		return new { written = path, bytes = bytes.Length, registered = asset is not null };
+	}
+
 	[McpTool( "soundevent_create", "Creates a .sound event resource referencing sound files (wav/mp3/ogg), playable via SoundEvent components or Sound.Play.", ToolCategory.Asset, Writes = true )]
 	public static object SoundEventCreate(
 		[Desc( "Output path ending in .sound, e.g. 'sounds/jump.sound'" )] string path,

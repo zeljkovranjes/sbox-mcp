@@ -51,7 +51,7 @@ public class ImportToolsDialog : Dialog
 		var buttons = Layout.AddRow();
 		buttons.AddStretchCell();
 		var done = buttons.Add( new Button.Primary( "Done" ) { Icon = "check" } );
-		done.Clicked = Destroy;
+		done.Clicked = Close; // Dialog.Close closes the host window (Destroy leaves it black)
 
 		Rebuild();
 	}

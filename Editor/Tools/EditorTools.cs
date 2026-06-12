@@ -56,6 +56,66 @@ public static class EditorTools
 			$"{(session.IsPlaying ? "game" : "scene")} camera view, {width}x{height}" ) );
 	}
 
+	[McpTool( "editor_screenshot_from", "Renders the scene from an arbitrary viewpoint (no camera component needed) - use it to inspect what you built from any angle.", ToolCategory.Editor )]
+	public static object ScreenshotFrom(
+		[Desc( "Camera world position [x, y, z]" )] float[] position,
+		[Desc( "Camera rotation [pitch, yaw, roll]; ignored when lookAt is set" )] float[] rotation = null,
+		[Desc( "GameObject id/name to aim the camera at" )] string lookAt = null,
+		int width = 1280,
+		int height = 720 )
+	{
+		var session = RequireSession();
+		var scene = session.Scene;
+
+		width = Math.Clamp( width, 64, 4096 );
+		height = Math.Clamp( height, 64, 4096 );
+
+		// temporary camera, intentionally outside any undo scope
+		var go = scene.CreateObject();
+		try
+		{
+			go.Name = "__mcp_temp_camera";
+			go.WorldPosition = ToVector3( position, "position" );
+
+			if ( lookAt is not null )
+			{
+				var target = FindGameObject( lookAt );
+				go.WorldRotation = Rotation.LookAt( target.WorldPosition - go.WorldPosition );
+			}
+			else if ( rotation is not null )
+			{
+				if ( rotation.Length != 3 )
+					throw new ArgumentException( "'rotation' must be [pitch, yaw, roll]" );
+
+				go.WorldRotation = Rotation.From( rotation[0], rotation[1], rotation[2] );
+			}
+
+			var camera = go.Components.Create<CameraComponent>();
+			var pixmap = new Pixmap( width, height );
+
+			if ( !camera.RenderToPixmap( pixmap ) )
+				throw new InvalidOperationException( "Rendering failed" );
+
+			return new RawMcpResult( McpResults.ImageContent(
+				Convert.ToBase64String( pixmap.GetPng() ),
+				$"view from [{string.Join( ", ", position )}], {width}x{height}" ) );
+		}
+		finally
+		{
+			go.Destroy();
+		}
+	}
+
+	[McpTool( "editor_frame_object", "Points the editor viewport camera at a GameObject so the user can see it.", ToolCategory.Editor )]
+	public static object FrameObject( [Desc( "GameObject id or unique name" )] string gameObject )
+	{
+		var session = RequireSession();
+		var go = FindGameObject( gameObject );
+
+		session.FrameTo( go.GetBounds() );
+		return new { framed = go.Name };
+	}
+
 	[McpTool( "editor_play", "Enters play mode with the current scene.", ToolCategory.Editor, Writes = true )]
 	public static object Play()
 	{

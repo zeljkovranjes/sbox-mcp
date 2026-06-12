@@ -80,6 +80,10 @@ public class ActivityPage : Widget
 		count.SetStyles( $"color: {Theme.TextLight.Hex}; font-size: 11px;" );
 		header.AddStretchCell();
 
+		var copy = header.Add( new Button( "Copy", "content_copy" ) );
+		copy.ToolTip = "Copy the activity feed as text";
+		copy.Clicked = CopyTranscript;
+
 		var clear = header.Add( new Button( "Clear", "delete_sweep" ) );
 		clear.Clicked = ActivityLog.Clear;
 
@@ -96,6 +100,30 @@ public class ActivityPage : Widget
 			canvas.Layout.Add( new ActivityRow( record, canvas ) );
 
 		canvas.Layout.AddStretchCell();
+	}
+
+	static void CopyTranscript()
+	{
+		var sb = new System.Text.StringBuilder();
+
+		// records are newest-first; export oldest-first for reading
+		foreach ( var r in ActivityLog.Records.Reverse() )
+		{
+			sb.Append( r.Time.ToString( "HH:mm:ss" ) )
+				.Append( r.Ok ? "  ok    " : "  ERROR " )
+				.Append( r.Category ).Append( "  " )
+				.Append( r.ToolName );
+
+			if ( !string.IsNullOrEmpty( r.ArgsDigest ) )
+				sb.Append( "  " ).Append( r.ArgsDigest );
+
+			if ( r.Error is not null )
+				sb.Append( "  -> " ).Append( r.Error );
+
+			sb.Append( "  (" ).Append( r.DurationMs ).AppendLine( " ms)" );
+		}
+
+		EditorUtility.Clipboard.Copy( sb.Length > 0 ? sb.ToString() : "no activity yet" );
 	}
 }
 

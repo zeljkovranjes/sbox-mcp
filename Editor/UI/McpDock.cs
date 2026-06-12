@@ -52,7 +52,8 @@ public class McpDock : Widget
 		if ( dock is null )
 		{
 			dock = new McpDock( EditorWindow );
-			EditorWindow.DockManager.AddDock( null, dock, DockArea.Right );
+			// floating by default - the user can dock it wherever they like
+			EditorWindow.DockManager.AddDock( null, dock, DockArea.Floating );
 		}
 
 		EditorWindow.DockManager.RaiseDock( dock );

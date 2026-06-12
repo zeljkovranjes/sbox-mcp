@@ -55,7 +55,8 @@ public static class McpHost
 		Server = new McpServer( registry, InvokeTool );
 		Server.StateChanged += () => Changed?.Invoke();
 
-		AppDomain.CurrentDomain.SetData( StopSlot, (Action)StopListener );
+		LogCapture.Start();
+		AppDomain.CurrentDomain.SetData( StopSlot, (Action)Shutdown );
 
 		Log.Info( $"s&box MCP loaded ({registry.Tools.Count} tools)" );
 
@@ -63,7 +64,11 @@ public static class McpHost
 			Start();
 	}
 
-	static void StopListener() => Server?.Stop();
+	static void Shutdown()
+	{
+		Server?.Stop();
+		LogCapture.Stop();
+	}
 
 	public static void Start()
 	{

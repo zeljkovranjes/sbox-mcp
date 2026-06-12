@@ -1,0 +1,15 @@
+{
+  "Title": "s&box MCP",
+  "Type": "library",
+  "Org": "local",
+  "Ident": "mcp",
+  "Schema": 1,
+  "HasAssets": false,
+  "HasCode": false,
+  "RootNamespace": "SboxMcp",
+  "Metadata": {
+    "Summary": "MCP server inside the s&box editor. Connect Claude Code, Cursor, Claude Desktop or VS Code and let AI drive scenes, assets, ModelDoc, AnimGraph, ShaderGraph, ActionGraph and more.",
+    "Description": "Install this library, open the MCP dock (View → MCP), copy the config for your AI client — done. Exposes ~60 editor tools over the Model Context Protocol with a live activity feed, tool browser and permission modes.",
+    "Public": true
+  }
+}

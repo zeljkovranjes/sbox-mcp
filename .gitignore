@@ -1,0 +1,15 @@
+# Local design docs / plans (not published)
+docs/superpowers/
+
+# Build artifacts
+bin/
+obj/
+*.user
+
+# s&box generated
+.sbox/
+.vs/
+*.sln
+*.csproj.bak
+ProjectSettings/
+Exports/

@@ -63,7 +63,7 @@ public class ActivityPage : Widget
 			var buttons = card.Layout.AddRow();
 			buttons.Spacing = 6;
 
-			var approve = buttons.Add( new Button.Primary( "Approve" ) { Icon = "check", Tint = Theme.Green } );
+			var approve = buttons.Add( new Button.Primary( "Approve" ) { Icon = "check" } );
 			approve.Clicked = request.Approve;
 
 			var deny = buttons.Add( new Button( "Deny", "close" ) );
@@ -79,6 +79,10 @@ public class ActivityPage : Widget
 		var count = header.Add( new Label( $"{ActivityLog.TotalCalls} total calls", canvas ) );
 		count.SetStyles( $"color: {Theme.TextLight.Hex}; font-size: 11px;" );
 		header.AddStretchCell();
+
+		var revert = header.Add( new Button( "Revert", "undo" ) );
+		revert.ToolTip = "Undo the AI's most recent editor action.\nOnly works while an MCP action is the newest entry on the undo stack - your own edits are never reverted.";
+		revert.Clicked = RevertLastMcpAction;
 
 		var copy = header.Add( new Button( "Copy", "content_copy" ) );
 		copy.ToolTip = "Copy the activity feed as text";
@@ -100,6 +104,29 @@ public class ActivityPage : Widget
 			canvas.Layout.Add( new ActivityRow( record, canvas ) );
 
 		canvas.Layout.AddStretchCell();
+	}
+
+	/// <summary>
+	/// Undoes the newest undo entry, but only when it is one of ours (every
+	/// MCP write runs in an undo scope named "MCP: ...") - never the user's
+	/// own edits.
+	/// </summary>
+	static void RevertLastMcpAction()
+	{
+		var session = SceneEditorSession.Active;
+		if ( session is null )
+			return;
+
+		if ( session.UndoSystem.Back.TryPeek( out var entry )
+			&& (entry.Name?.StartsWith( "MCP", StringComparison.OrdinalIgnoreCase ) ?? false) )
+		{
+			session.UndoSystem.Undo();
+			McpHost.Log.Info( $"Reverted '{entry.Name}'" );
+		}
+		else
+		{
+			McpHost.Log.Info( "Nothing to revert - the newest undo entry is not an MCP action" );
+		}
 	}
 
 	static void CopyTranscript()

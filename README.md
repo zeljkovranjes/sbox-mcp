@@ -1,4 +1,4 @@
-<p align="center"><img src="logo.png" width="140" alt="s&box MCP logo"></p>
+<p align="center"><img src="Brain10.webp" width="140" alt="s&box MCP logo"></p>
 
 # s&box MCP
 

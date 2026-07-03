@@ -83,8 +83,36 @@ public static class HelpTools
 		["discover-the-api"] = ("Discover any engine/project API",
 			"1. api_search query='rigidbody' (componentsOnly=true to filter) - finds ANY type, engine or project.\n"
 			+ "2. api_get_type 'Rigidbody' - real properties and method signatures.\n"
-			+ "3. Components -> component_add / component_set_property. Static APIs / methods -> use them from code (code_write_file).\n"
-			+ "4. This works for the project's own types too - search your game's classes the same way."),
+			+ "3. Components -> component_add / component_set_property. Static APIs / methods -> invoke_static, or use them from code.\n"
+			+ "4. Full offline reference: api_reference writes the whole current-build API to a file (auto-refreshes when you update s&box).\n"
+			+ "5. This works for the project's own types too - search your game's classes the same way."),
+
+		["call-anything"] = ("Call any method / property (dynamic layer)",
+			"Beyond the named tools, you can invoke ANYTHING in the live engine:\n"
+			+ "1. invoke_static typeName='Sandbox.Sound' method='Play' args=['sounds/x.sound'] - any public static method.\n"
+			+ "2. invoke_component_method gameObject=id type='Rigidbody' method='ApplyForce' args=[[0,0,50000]] - any instance method.\n"
+			+ "3. get_static_property / set_static_property - read/write any static state (Time.Now, Game.IsPlaying...).\n"
+			+ "4. Always api_get_type first to see exact names and parameter order.\n"
+			+ "5. GameObject/Component parameters: pass an id string (or 'goId:ComponentType' for a specific component)."),
+
+		["work-fast"] = ("Do many steps in one request",
+			"1. batch steps=[{name, arguments}, ...] runs a whole sequence in order in one call - far fewer round-trips.\n"
+			+ "2. Example: create a GameObject, add ModelRenderer, set Model, set Tint - four steps, one batch.\n"
+			+ "3. It stops at the first failing step unless continueOnError=true; each step's result comes back.\n"
+			+ "4. Great for building repetitive structures (a room, a grid of props)."),
+
+		["stay-current"] = ("Keep API info up to date",
+			"1. api_search / api_get_type are LIVE reflection - never stale, they read the running build.\n"
+			+ "2. api_version reports the editor build and whether the exported reference matches it.\n"
+			+ "3. api_reference regenerates the full reference automatically when the build changes (i.e. when you update s&box).\n"
+			+ "4. So there is nothing to sync manually - the information tracks the installed editor by construction."),
+
+		["customize-the-server"] = ("Customize the server",
+			"1. server_get_config - port, permission mode, autostart, tool counts, connected clients.\n"
+			+ "2. server_set_config - change port/autostart over MCP (permission mode stays user-only, by design).\n"
+			+ "3. In the dashboard's Tools tab: enable/disable any individual tool (persists), or Import Tools to expose\n"
+			+ "   public static methods from your other installed libraries as new MCP tools.\n"
+			+ "4. Disabled tools vanish from the client's list and are rejected if called."),
 
 		["safety-and-revert"] = ("Safety and reverting",
 			"1. Every scene mutation runs in an undo scope - the user can Ctrl+Z or right-click the action in the Activity feed to revert it.\n"

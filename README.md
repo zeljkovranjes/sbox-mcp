@@ -2,7 +2,7 @@
 
 # s&box MCP
 
-**An MCP server that runs inside the s&box editor.** Connect Claude Code, Claude Desktop, Cursor or VS Code and let AI build games in the editor — scenes, GameObjects, components, prefabs, assets, materials, sounds, input actions, cloud content, ModelDoc, AnimGraph, ShaderGraph, ActionGraph, code files (C#/Razor/SCSS), console diagnostics, play mode and screenshots. 80 tools including live API discovery and built-in workflow recipes (`help`), an in-editor dashboard, and a setup that is exactly two steps.
+**An MCP server that runs inside the s&box editor.** Connect Claude Code, Claude Desktop, Cursor or VS Code and let AI build games in the editor — scenes, GameObjects, components, prefabs, assets, materials, sounds, input actions, cloud content, ModelDoc, AnimGraph, ShaderGraph, ActionGraph, code files (C#/Razor/SCSS), console diagnostics, play mode and screenshots. 90+ tools plus a dynamic invocation layer (any engine method is callable), live self-updating API discovery, built-in workflow recipes (`help`), an in-editor dashboard, and a setup that is exactly two steps.
 
 ## Setup
 
@@ -56,9 +56,10 @@ Effectively **everything an AI could reasonably drive in the editor.** Beyond th
 named tools below, four universal mechanisms give total reach:
 
 - **Any component property** — `component_set_property` sets any `[Property]` on any component (built-in or custom).
+- **Any method or static** — `invoke_static`, `invoke_component_method`, `get_/set_static_property` call anything in the live engine via reflection. This is effectively unlimited tools — every engine method is callable.
 - **Any text asset** — `asset_write_raw` writes any resource; every s&box format is KV3 or JSON.
 - **Any C#** — `code_write_file` writes components, systems, editor tools, UI; the editor hot-reloads.
-- **Any type** — `api_search` / `api_get_type` reflect the whole API so the AI discovers what exists.
+- **Any type** — `api_search` / `api_get_type` reflect the whole API; `api_reference` exports the full current-build reference and auto-refreshes when you update s&box.
 
 So "add a player" isn't a special tool — the AI finds `PlayerController` with
 `api_search`, reads its fields with `api_get_type`, and composes it. See
@@ -81,8 +82,11 @@ the (few) honest limits.
 | `shadergraph_` / `actiongraph_` | Read/write the JSON formats, list nodes |
 | `input_` / `project_` | List/add/remove input actions, set the startup scene |
 | `code_` | List/read/write C#, Razor, SCSS and shader files (hot-reload is automatic), scaffold a component, compile errors, invoke a static method to test |
-| `api_` | Search the whole s&box + project type surface, read any type's real members |
-| `help` | Step-by-step recipes for composing tools (make a player, materials, testing...) |
+| `api_` | Search/read the whole type surface; export & auto-refresh a full current-build reference (`api_search/get_type/reference/version/dump`) |
+| `invoke_` / `*_static_property` | Dynamic layer — call any method, read/write any static, on the live engine |
+| `batch` | Run many tool calls in one request |
+| `server_` | Read/adjust the server's own config (port, autostart) over MCP |
+| `help` | Step-by-step recipes for composing tools (make a player, call-anything, work-fast...) |
 | `editor_` | Console logs, screenshots (incl. from any angle), play/stop, console commands, project info, selection, frame object |
 | `retargeter_` | Drives the Humanoid Retargeter library when installed (shown disabled otherwise) |
 | `lib_` | Tools you imported from other libraries via Import Tools |

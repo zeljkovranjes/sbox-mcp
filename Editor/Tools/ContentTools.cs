@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using Editor;
@@ -92,6 +93,10 @@ public static class ContentTools
 
 		if ( soundFiles is null || soundFiles.Length == 0 )
 			throw new ArgumentException( "Pass at least one sound file path" );
+
+		var missing = soundFiles.Where( s => AssetSystem.FindByPath( s ) is null ).ToArray();
+		if ( missing.Length > 0 )
+			throw new InvalidOperationException( $"Sound file(s) not in the project: {string.Join( ", ", missing )} - use asset_search or cloud_install first" );
 
 		var json = JsonSerializer.Serialize( new Dictionary<string, object>
 		{

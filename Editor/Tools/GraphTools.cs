@@ -55,7 +55,7 @@ public static class GraphTools
 	public static object AnimGraphListParameters( [Desc( "Animgraph asset path" )] string path )
 	{
 		var asset = AssetSystem.FindByPath( path )
-			?? throw new InvalidOperationException( $"No animgraph at '{path}'" );
+			?? throw new InvalidOperationException( $"No animgraph at '{path}' - use asset_search with assetType 'vanmgrph'" );
 
 		var graph = AnimationGraph.Load( asset.Path )
 			?? throw new InvalidOperationException( $"'{path}' failed to load - is it compiled? Try asset_compile first" );
@@ -95,7 +95,7 @@ public static class GraphTools
 	public static object ShaderGraphListNodes( [Desc( "Shadergraph asset path" )] string path )
 	{
 		var asset = AssetSystem.FindByPath( path )
-			?? throw new InvalidOperationException( $"No shadergraph at '{path}'" );
+			?? throw new InvalidOperationException( $"No shadergraph at '{path}' - use asset_search with assetType 'shdrgrph'" );
 
 		var doc = JsonDocument.Parse( File.ReadAllText( asset.GetSourceFile( true ) ) );
 

@@ -37,9 +37,22 @@ public static class CloudTools
 	public static async Task<object> Install(
 		[Desc( "Package ident from cloud_search, e.g. 'facepunch.wooden_crate'" )] string packageIdent )
 	{
-		var asset = await AssetSystem.InstallAsync( packageIdent )
-			?? throw new InvalidOperationException( $"'{packageIdent}' could not be installed - check the ident with cloud_search" );
+		// fetch first so an unknown ident gives a clear error before we install
+		var package = await Package.FetchAsync( packageIdent, false )
+			?? throw new InvalidOperationException( $"No cloud package '{packageIdent}' - check the ident with cloud_search" );
 
-		return (object)new { installed = asset.Path, note = "reference it by this path, e.g. in component_set_property" };
+		var asset = await AssetSystem.InstallAsync( packageIdent );
+
+		// InstallAsync returns null even on SUCCESS when the package has no single
+		// primary asset (model packs, material collections) - don't report failure
+		if ( asset is not null )
+			return (object)new { installed = asset.Path, package = package.FullIdent, note = "reference it by this path, e.g. in component_set_property" };
+
+		return (object)new
+		{
+			installed = package.FullIdent,
+			primaryAsset = (string)null,
+			note = "Installed. This package has no single primary asset (e.g. a pack) - use asset_search to find the individual files it added."
+		};
 	}
 }

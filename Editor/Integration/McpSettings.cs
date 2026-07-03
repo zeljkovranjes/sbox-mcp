@@ -6,8 +6,10 @@ using static Sandbox.Internal.GlobalToolsNamespace;
 
 namespace SboxMcp.Integration;
 
-/// <summary>A user-imported tool: a public static method from another library.</summary>
-public sealed record ImportedToolDef( string Assembly, string Type, string Method );
+/// <summary>A user-imported tool: a public static method from another library.
+/// Signature (comma-joined parameter type names) distinguishes overloads;
+/// null when loaded from older persisted data.</summary>
+public sealed record ImportedToolDef( string Assembly, string Type, string Method, string Signature = null );
 
 /// <summary>
 /// Persisted settings. EditorCookie is not thread-safe and must only be

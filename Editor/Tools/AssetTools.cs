@@ -97,12 +97,12 @@ public static class AssetTools
 		var absolute = ResolveNewAssetPath( path );
 
 		if ( File.Exists( absolute ) )
-			throw new InvalidOperationException( $"'{path}' already exists" );
+			throw new InvalidOperationException( $"'{path}' already exists - use asset_write_raw to overwrite, or pick another path" );
 
 		Directory.CreateDirectory( Path.GetDirectoryName( absolute ) );
 
 		var asset = AssetSystem.CreateResource( type.TrimStart( '.' ), absolute )
-			?? throw new InvalidOperationException( $"Could not create a '{type}' resource at '{path}'" );
+			?? throw new InvalidOperationException( $"Could not create a '{type}' resource at '{path}' - is '{type}' a known resource extension? Check an existing one with asset_search" );
 
 		return new { created = asset.Path, type = asset.AssetType?.FriendlyName };
 	}

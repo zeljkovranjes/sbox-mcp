@@ -133,7 +133,7 @@ public static class ConvenienceTools
 			var camera = go.Components.Create<CameraComponent>();
 			var pixmap = new Pixmap( width, height );
 			if ( !camera.RenderToPixmap( pixmap ) )
-				throw new InvalidOperationException( "Rendering failed" );
+				throw new InvalidOperationException( "Rendering failed - check editor_get_logs and verify the position is valid" );
 
 			var absolute = AssetTools.ResolveNewAssetPath( path );
 			System.IO.Directory.CreateDirectory( System.IO.Path.GetDirectoryName( absolute ) );

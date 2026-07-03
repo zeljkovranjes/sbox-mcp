@@ -75,7 +75,7 @@ public static class RetargeterTools
 			throw new FileNotFoundException( $"Not found: {string.Join( ", ", missing )}" );
 
 		var window = OpenWindow();
-		var addFiles = window.GetType().GetMethod( "AddFiles", BindingFlags.Public | BindingFlags.Instance )
+		var addFiles = window?.GetType().GetMethod( "AddFiles", BindingFlags.Public | BindingFlags.Instance )
 			?? throw new InvalidOperationException( "The installed Humanoid Retargeter version has no AddFiles method - update one of the two libraries" );
 
 		addFiles.Invoke( window, new object[] { resolved } );
@@ -90,6 +90,7 @@ public static class RetargeterTools
 		var open = type.GetMethod( "Open", BindingFlags.Public | BindingFlags.Static )
 			?? throw new InvalidOperationException( "The installed Humanoid Retargeter version has no Open method - update one of the two libraries" );
 
-		return open.Invoke( null, null );
+		return open.Invoke( null, null )
+			?? throw new InvalidOperationException( "The Humanoid Retargeter's Open() returned nothing - update the library (see retargeter_status)" );
 	}
 }

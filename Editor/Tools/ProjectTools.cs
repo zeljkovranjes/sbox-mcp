@@ -37,8 +37,11 @@ public static class ProjectTools
 
 		settings.Actions ??= new();
 
+		if ( !System.Text.RegularExpressions.Regex.IsMatch( name ?? "", @"^[a-zA-Z0-9_\-]+$" ) )
+			throw new ArgumentException( "Action name may only contain letters, digits, underscore and hyphen (no spaces)" );
+
 		if ( settings.Actions.Any( a => string.Equals( a.Name, name, StringComparison.OrdinalIgnoreCase ) ) )
-			throw new InvalidOperationException( $"An input action named '{name}' already exists" );
+			throw new InvalidOperationException( $"An input action named '{name}' already exists - input_list_actions shows it; remove it first with input_remove_action" );
 
 		settings.Actions.Add( new InputAction { Name = name, KeyboardCode = keyboardCode, GroupName = group } );
 		SaveInputSettings( settings );
@@ -66,7 +69,10 @@ public static class ProjectTools
 		var root = AssetTools.ProjectRoot;
 		var dir = Path.Combine( root, "ProjectSettings" );
 		Directory.CreateDirectory( dir );
-		File.WriteAllText( Path.Combine( dir, "Input.config" ), Json.Serialize( settings ) );
+		// use the config's own Serialize so the __schema/__version header is
+		// written the way the engine expects (keeps upgraders working)
+		File.WriteAllText( Path.Combine( dir, "Input.config" ),
+			settings.Serialize().ToJsonString( new System.Text.Json.JsonSerializerOptions { WriteIndented = true } ) );
 	}
 
 	[McpTool( "project_set_startup_scene", "Sets the scene the game opens with when launched.", ToolCategory.Editor, Writes = true )]

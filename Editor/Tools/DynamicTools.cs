@@ -63,7 +63,7 @@ public static class DynamicTools
 		if ( type.GetField( member, Static ) is FieldInfo f )
 			return new { type = typeName, member, value = Present( f.GetValue( null ) ) };
 
-		throw new InvalidOperationException( $"'{typeName}' has no readable static property/field '{member}' - use api_get_type to list members" );
+		throw new InvalidOperationException( $"'{typeName}' has no readable static property/field '{member}' - use api_get_type to list its members" );
 	}
 
 	[McpTool( "set_static_property", "Writes any public static property or field. Value is JSON.", ToolCategory.Editor, Writes = true )]

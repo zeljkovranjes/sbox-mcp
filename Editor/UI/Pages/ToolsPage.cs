@@ -127,6 +127,9 @@ public class ToolRow : Widget
 	{
 		base.OnMouseClick( e );
 
+		if ( e.RightMouseButton )
+			return;
+
 		// the toggle lives in the right strip of the row
 		if ( e.LocalPosition.x < LocalRect.Right - ToggleWidth )
 			return;

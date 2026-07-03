@@ -90,17 +90,23 @@ public static class ToolImporter
 	public static string ToolNameFor( ImportedToolDef def )
 	{
 		var typeName = def.Type.Split( '.' ).Last();
-		return Sanitize( $"lib_{typeName}_{def.Method}" );
+		// include a short signature suffix so overloads and same-named types
+		// don't collide on one tool name
+		var suffix = string.IsNullOrEmpty( def.Signature ) ? "" : "_" + Math.Abs( def.Signature.GetHashCode() % 10000 );
+		return Sanitize( $"lib_{typeName}_{def.Method}{suffix}" );
 	}
 
 	static string Sanitize( string name ) =>
 		new( name.Select( c => char.IsLetterOrDigit( c ) ? char.ToLowerInvariant( c ) : '_' ).ToArray() );
 
+	static string SignatureOf( MethodInfo method ) =>
+		string.Join( ",", method.GetParameters().Select( p => p.ParameterType.Name ) );
+
 	public static bool IsImported( MethodInfo method ) =>
 		McpSettings.ImportedTools.Contains( DefFor( method ) );
 
 	public static ImportedToolDef DefFor( MethodInfo method ) =>
-		new( method.DeclaringType?.Assembly.GetName().Name, method.DeclaringType?.FullName, method.Name );
+		new( method.DeclaringType?.Assembly.GetName().Name, method.DeclaringType?.FullName, method.Name, SignatureOf( method ) );
 
 	/// <summary>Imports a method now and persists the choice.</summary>
 	public static void Import( MethodInfo method )
@@ -137,8 +143,15 @@ public static class ToolImporter
 			.LastOrDefault( a => a.GetName().Name == def.Assembly );
 
 		var type = assembly?.GetType( def.Type );
-		return type?.GetMethods( BindingFlags.Public | BindingFlags.Static )
-			.FirstOrDefault( m => m.Name == def.Method && !m.IsGenericMethodDefinition );
+		var overloads = type?.GetMethods( BindingFlags.Public | BindingFlags.Static )
+			.Where( m => m.Name == def.Method && !m.IsGenericMethodDefinition )
+			.ToArray() ?? Array.Empty<MethodInfo>();
+
+		// match the exact overload the user picked; older data (null signature)
+		// falls back to the first, preserving prior behavior
+		return def.Signature is null
+			? overloads.FirstOrDefault()
+			: overloads.FirstOrDefault( m => SignatureOf( m ) == def.Signature ) ?? overloads.FirstOrDefault();
 	}
 
 	static void Register( ToolRegistry registry, ImportedToolDef def, MethodInfo method )
@@ -147,10 +160,13 @@ public static class ToolImporter
 			return;
 
 		var parameters = string.Join( ", ", method.GetParameters().Select( p => p.Name ) );
-		registry.AddImported(
+		var registered = registry.AddImported(
 			ToolNameFor( def ),
 			$"Imported from the '{def.Assembly}' library: {def.Type.Split( '.' ).Last()}.{def.Method}({parameters})",
 			ToolCategory.Imported,
 			method );
+
+		if ( registered is null )
+			McpHost.Log.Warning( $"Could not import {def.Type}.{def.Method} - a tool named '{ToolNameFor( def )}' already exists" );
 	}
 }

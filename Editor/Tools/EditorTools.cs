@@ -48,7 +48,7 @@ public static class EditorTools
 		var pixmap = new Pixmap( width, height );
 
 		if ( !scene.RenderToPixmap( pixmap ) )
-			throw new InvalidOperationException( "Rendering failed - is the scene camera valid?" );
+			throw new InvalidOperationException( "Rendering failed - check editor_get_logs; ensure a valid camera, or try editor_screenshot_from" );
 
 		var png = pixmap.GetPng();
 		return new RawMcpResult( McpResults.ImageContent(

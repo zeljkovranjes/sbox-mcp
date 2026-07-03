@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using Sandbox;
 using SboxMcp.Integration;
 using SboxMcp.Registry;
 using static SboxMcp.Tools.AssetTools;
@@ -56,6 +57,70 @@ public static class CodeTools
 		File.WriteAllText( absolute, content );
 
 		return new { written = path, note = "hot-reload triggers automatically; verify with code_get_compile_errors" };
+	}
+
+	[McpTool( "code_create_component", "Scaffolds a new Component C# file (a script you can add to GameObjects) with the standard boilerplate and any [Property] fields. The editor hot-reloads it, then add it with component_add.", ToolCategory.Code, Writes = true )]
+	public static object CreateComponent(
+		[Desc( "Component class name, e.g. 'PlayerMovement'" )] string className,
+		[Desc( "Namespace; omit for the project default" )] string @namespace = null,
+		[Desc( "Property fields as 'Type Name' pairs, e.g. ['float Speed', 'GameObject Target']" )] string[] properties = null,
+		[Desc( "Add an OnUpdate() method body" )] bool withUpdate = true )
+	{
+		if ( string.IsNullOrWhiteSpace( className ) || !char.IsLetter( className[0] ) )
+			throw new ArgumentException( "className must start with a letter" );
+
+		var ns = @namespace ?? DefaultNamespace();
+		var sb = new System.Text.StringBuilder();
+		sb.AppendLine( "using Sandbox;" ).AppendLine();
+		sb.AppendLine( $"namespace {ns};" ).AppendLine();
+		sb.AppendLine( $"public sealed class {className} : Component" );
+		sb.AppendLine( "{" );
+
+		foreach ( var p in properties ?? Array.Empty<string>() )
+		{
+			var parts = p.Split( ' ', StringSplitOptions.RemoveEmptyEntries );
+			if ( parts.Length == 2 )
+				sb.AppendLine( $"\t[Property] public {parts[0]} {parts[1]} {{ get; set; }}" ).AppendLine();
+		}
+
+		if ( withUpdate )
+		{
+			sb.AppendLine( "\tprotected override void OnUpdate()" );
+			sb.AppendLine( "\t{" );
+			sb.AppendLine( "\t\t// runs every frame while the component is enabled" );
+			sb.AppendLine( "\t}" );
+		}
+
+		sb.AppendLine( "}" );
+
+		var path = $"Code/{className}.cs";
+		var absolute = ResolveInProject( path );
+		if ( File.Exists( absolute ) )
+			throw new InvalidOperationException( $"'{path}' already exists - edit it with code_write_file" );
+
+		Directory.CreateDirectory( Path.GetDirectoryName( absolute ) );
+		File.WriteAllText( absolute, sb.ToString() );
+
+		return new { created = path, className, note = $"hot-reloading; then component_add(go, \"{className}\")" };
+	}
+
+	static string DefaultNamespace()
+	{
+		// RootNamespace lives in the .sbproj; read it from there rather than
+		// guessing the config property name
+		try
+		{
+			var sbproj = Directory.GetFiles( ProjectRoot, "*.sbproj" ).FirstOrDefault();
+			if ( sbproj is not null
+				&& System.Text.Json.Nodes.JsonNode.Parse( File.ReadAllText( sbproj ) ) is System.Text.Json.Nodes.JsonObject json
+				&& json["RootNamespace"]?.GetValue<string>() is string ns && !string.IsNullOrWhiteSpace( ns ) )
+			{
+				return ns;
+			}
+		}
+		catch { /* fall through to default */ }
+
+		return "Sandbox";
 	}
 
 	[McpTool( "code_run_static_method", "Invokes a public static parameterless method from project code - write a method with code_write_file, wait for hot-reload, then call it to test or inspect game state. Returns the method's ToString'd result.", ToolCategory.Code, Writes = true )]

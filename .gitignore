@@ -6,6 +6,9 @@ dev/
 .claude/
 .mcp.json
 
+# Local API reference dump (not published)
+api_surface.txt
+
 # Build artifacts
 bin/
 obj/

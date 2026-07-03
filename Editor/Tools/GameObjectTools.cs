@@ -45,12 +45,12 @@ public static class GameObjectTools
 		return Describe( go );
 	}
 
-	[McpTool( "gameobject_spawn_model", "Spawns a prop in one step: creates a GameObject, adds a ModelRenderer with the given model, and optionally a matching ModelCollider so physics/traces hit it. The common 'place a model' operation (vs gameobject_create + component_add + component_set_property).", ToolCategory.GameObject, Writes = true )]
+	[McpTool( "gameobject_spawn_model", "Spawns a prop in one step: creates a GameObject, adds a ModelRenderer with the given model, and optionally a matching ModelCollider so physics/traces hit it. The common 'place a model' operation (vs gameobject_create + component_add + component_set_property). Note: withCollider uses the model's own collision mesh - dev primitives like box.vmdl have none, so add a BoxCollider yourself for those.", ToolCategory.GameObject, Writes = true )]
 	public static object SpawnModel(
 		[Desc( "Model asset path, e.g. 'models/dev/box.vmdl'" )] string model,
 		[Desc( "Object name; defaults to the model's file name" )] string name = null,
 		[Desc( "World position [x, y, z]" )] float[] position = null,
-		[Desc( "Also add a ModelCollider so the prop is solid" )] bool withCollider = false )
+		[Desc( "Also add a ModelCollider (only solid if the model has a collision mesh)" )] bool withCollider = false )
 	{
 		if ( AssetSystem.FindByPath( model ) is null )
 			throw new InvalidOperationException( $"No model at '{model}' - use asset_search with assetType 'model'" );

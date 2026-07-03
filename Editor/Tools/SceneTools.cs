@@ -38,7 +38,10 @@ public static class SceneTools
 		ground.Name = "Ground";
 		ground.LocalScale = new Vector3( groundScale, groundScale, 1f );
 		ground.Components.Create<ModelRenderer>().Model = box;
-		ground.Components.Create<ModelCollider>().Model = box;
+		// A BoxCollider (primitive), NOT a ModelCollider: the dev box model has
+		// no collision mesh, so a ModelCollider would leave the ground non-solid
+		// and objects would fall straight through it.
+		ground.Components.Create<BoxCollider>();
 
 		var sun = session.Scene.CreateObject();
 		sun.Name = "Sun";

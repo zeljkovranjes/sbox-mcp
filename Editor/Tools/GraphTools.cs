@@ -34,8 +34,9 @@ public static class GraphTools
 		if ( raw )
 			return new { path = asset.Path, format = "kv3", content = text };
 
-		var json = EditorUtility.KeyValues3ToJson( text )
-			?? throw new InvalidOperationException( $"'{path}' could not be parsed as KV3" );
+		var json = EditorUtility.KeyValues3ToJson( text );
+		if ( json is null )
+			return new { path = asset.Path, format = "kv3 (JSON conversion unavailable for this graph; this is the raw source)", content = text };
 
 		return new { path = asset.Path, format = "json (read-only view; write with animgraph_set using KV3)", content = json };
 	}

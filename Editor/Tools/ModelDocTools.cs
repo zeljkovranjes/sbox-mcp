@@ -62,8 +62,12 @@ public static class ModelDocTools
 		if ( raw )
 			return new { path = asset.Path, format = "kv3", content = text };
 
-		var json = EditorUtility.KeyValues3ToJson( text )
-			?? throw new InvalidOperationException( $"'{vmdlPath}' could not be parsed as KV3" );
+		var json = EditorUtility.KeyValues3ToJson( text );
+		if ( json is null )
+			// some complex/newer models don't round-trip through the JSON
+			// converter - fall back to the raw KV3 (still fully usable) rather
+			// than failing the read
+			return new { path = asset.Path, format = "kv3 (JSON conversion unavailable for this model; this is the raw source)", content = text };
 
 		return new { path = asset.Path, format = "json (read-only view; write with modeldoc_set using KV3)", content = json };
 	}

@@ -51,6 +51,16 @@ public static class ContentTools
 		return AssetTools.WriteRaw( path, sb.ToString() );
 	}
 
+	[McpTool( "sound_play", "Plays a sound event in the editor to preview it.", ToolCategory.Asset )]
+	public static object SoundPlay( [Desc( "Sound event asset path, e.g. 'sounds/jump.sound'" )] string soundEvent )
+	{
+		if ( AssetSystem.FindByPath( soundEvent ) is null )
+			throw new InvalidOperationException( $"No sound event at '{soundEvent}' - use asset_search with assetType 'sound'" );
+
+		Sound.Play( soundEvent );
+		return new { played = soundEvent };
+	}
+
 	[McpTool( "texture_write", "Saves base64-encoded image bytes (png/jpg/tga) as a texture asset - pipe in generated or downloaded images, then use them in material_create.", ToolCategory.Asset, Writes = true )]
 	public static object TextureWrite(
 		[Desc( "Output path ending in .png/.jpg/.tga, e.g. 'textures/crate_color.png'" )] string path,

@@ -153,6 +153,25 @@ public static class EditorTools
 		return new { ran = command, note = "check editor_get_logs for output" };
 	}
 
+	[McpTool( "convar_get", "Reads a console variable's value (game/engine settings).", ToolCategory.Editor )]
+	public static object ConVarGet( [Desc( "ConVar name, e.g. 'sv_gravity'" )] string name )
+	{
+		var value = Sandbox.ConsoleSystem.GetValue( name, null );
+		if ( value is null )
+			throw new InvalidOperationException( $"No console variable '{name}' - check the exact name with editor_run_console_command 'find {name}'" );
+
+		return new { name, value };
+	}
+
+	[McpTool( "convar_set", "Sets a console variable's value.", ToolCategory.Editor, Writes = true )]
+	public static object ConVarSet(
+		[Desc( "ConVar name" )] string name,
+		[Desc( "New value (string)" )] string value )
+	{
+		Sandbox.ConsoleSystem.SetValue( name, value );
+		return new { name, value = Sandbox.ConsoleSystem.GetValue( name, value ) };
+	}
+
 	[McpTool( "editor_get_project_info", "Gets the current project: title, ident, type, paths.", ToolCategory.Editor )]
 	public static object GetProjectInfo()
 	{

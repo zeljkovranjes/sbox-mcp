@@ -109,6 +109,23 @@ public static class QueryTools
 		return new { cleared = true };
 	}
 
+	[McpTool( "gameobject_set_tags", "Replaces all of a GameObject's tags with the given set.", ToolCategory.GameObject, Writes = true )]
+	public static object SetTags(
+		[Desc( "GameObject id or unique name" )] string gameObject,
+		[Desc( "The complete tag list (replaces existing)" )] string[] tags )
+	{
+		var session = RequireSession();
+		var go = FindGameObject( gameObject );
+
+		using var undo = session.UndoScope( "MCP: set tags" ).WithGameObjectChanges( go, GameObjectUndoFlags.Properties ).Push();
+
+		go.Tags.RemoveAll();
+		foreach ( var tag in tags ?? Array.Empty<string>() )
+			go.Tags.Add( tag );
+
+		return new { gameObject = go.Name, tags = go.Tags.TryGetAll().ToArray() };
+	}
+
 	[McpTool( "gameobject_distance", "Measures the distance between two GameObjects.", ToolCategory.GameObject )]
 	public static object Distance(
 		[Desc( "First GameObject id or unique name" )] string a,

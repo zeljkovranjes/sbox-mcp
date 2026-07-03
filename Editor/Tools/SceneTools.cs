@@ -25,27 +25,6 @@ public static class SceneTools
 		};
 	}
 
-	[McpTool( "scene_tick", "Manually advances the scene's simulation and animation by N steps of `delta` seconds each - progresses animgraphs, physics and component OnUpdate WITHOUT waiting on the editor frame loop (which pauses when the editor is unfocused). Use before a screenshot to make animations settle into a pose.", ToolCategory.Scene, Writes = true )]
-	public static object Tick(
-		[Desc( "How many frames to advance" )] int steps = 30,
-		[Desc( "Seconds per step (default ~1/30s)" )] float delta = 0.033f )
-	{
-		if ( steps < 1 || steps > 100000 )
-			throw new ArgumentException( "steps must be 1..100000" );
-		if ( delta <= 0f )
-			throw new ArgumentException( "delta must be positive" );
-
-		var scene = RequireScene();
-		var t = RealTime.Now;
-		for ( var i = 0; i < steps; i++ )
-		{
-			t += delta;
-			scene.EditorTick( t, delta );
-		}
-
-		return new { advanced = steps, seconds = steps * delta };
-	}
-
 	[McpTool( "scene_get_hierarchy", "Gets the scene's GameObject tree with ids, names and component types.", ToolCategory.Scene )]
 	public static object GetHierarchy(
 		[Desc( "How many levels deep to expand" )] int maxDepth = 4,

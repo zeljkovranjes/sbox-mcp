@@ -64,6 +64,22 @@ public static class ProjectTools
 		return new { removed = action.Name };
 	}
 
+	[McpTool( "input_set_action", "Programmatically presses or releases an input action to test player controls autonomously during play mode (press 'Forward' and check the player moves; call with down=false to release). This injects runtime input - it does not change bindings (use input_add_action for that).", ToolCategory.Editor, Writes = true )]
+	public static object SetInputAction(
+		[Desc( "Action name, e.g. 'Forward', 'Jump', 'attack1'" )] string action,
+		[Desc( "true = pressed/held, false = released" )] bool down = true )
+	{
+		Sandbox.Input.SetAction( action, down );
+		return new { action, down, note = "effective in play mode; re-call each step to hold across frames" };
+	}
+
+	[McpTool( "input_clear_actions", "Releases all programmatically-set input actions (undo input_set_action).", ToolCategory.Editor )]
+	public static object ClearInputActions()
+	{
+		Sandbox.Input.ClearActions();
+		return new { cleared = true };
+	}
+
 	static void SaveInputSettings( InputSettings settings )
 	{
 		var root = AssetTools.ProjectRoot;

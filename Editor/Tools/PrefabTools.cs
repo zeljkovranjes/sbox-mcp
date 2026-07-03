@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Editor;
 using Sandbox;
 using SboxMcp.Registry;
@@ -29,6 +31,34 @@ public static class PrefabTools
 
 		var instance = prefabScene.Clone( transform );
 		return Describe( instance );
+	}
+
+	[McpTool( "prefab_instantiate_many", "Instantiates a prefab at many world positions in one call - populate a level efficiently (a forest of trees, a row of enemies, scattered pickups). Returns the created instance ids.", ToolCategory.Prefab, Writes = true )]
+	public static object InstantiateMany(
+		[Desc( "Prefab asset path, e.g. 'prefabs/tree.prefab'" )] string prefabPath,
+		[Desc( "World positions, each [x, y, z]" )] float[][] positions )
+	{
+		if ( positions is null || positions.Length == 0 )
+			throw new ArgumentException( "Pass at least one position" );
+
+		var session = RequireSession();
+
+		var prefabFile = ResourceLibrary.Get<PrefabFile>( prefabPath )
+			?? throw new InvalidOperationException( $"No prefab at '{prefabPath}' - use asset_search with assetType 'prefab'" );
+
+		var prefabScene = SceneUtility.GetPrefabScene( prefabFile )
+			?? throw new InvalidOperationException( $"Prefab '{prefabPath}' could not be loaded" );
+
+		using var undo = session.UndoScope( $"MCP: instantiate {positions.Length}x {prefabPath}" ).WithGameObjectCreations().Push();
+
+		var instances = new List<object>();
+		foreach ( var pos in positions )
+		{
+			var instance = prefabScene.Clone( new Transform( ToVector3( pos, "position" ) ) );
+			instances.Add( new { id = instance.Id, name = instance.Name, position = pos } );
+		}
+
+		return new { prefab = prefabPath, count = instances.Count, instances };
 	}
 
 	[McpTool( "prefab_create_from_gameobject", "Turns a GameObject (and its children) into a reusable .prefab asset; the original becomes an instance of it.", ToolCategory.Prefab, Writes = true )]

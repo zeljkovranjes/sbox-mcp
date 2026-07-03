@@ -120,6 +120,36 @@ public static class GameObjectTools
 		return Describe( go );
 	}
 
+	[McpTool( "gameobject_spawn_camera", "Spawns a camera in one step: creates a GameObject with a CameraComponent, optionally positioned/aimed with a field of view. Every scene needs a camera to render in play mode.", ToolCategory.GameObject, Writes = true )]
+	public static object SpawnCamera(
+		[Desc( "Object name" )] string name = "Camera",
+		[Desc( "World position [x, y, z]" )] float[] position = null,
+		[Desc( "Rotation [pitch, yaw, roll] - where the camera looks" )] float[] rotation = null,
+		[Desc( "Field of view in degrees (default 60)" )] float fieldOfView = 60f )
+	{
+		var session = RequireSession();
+
+		using var undo = session.UndoScope( "MCP: spawn camera" ).WithGameObjectCreations().Push();
+
+		var go = session.Scene.CreateObject();
+		go.Name = string.IsNullOrWhiteSpace( name ) ? "Camera" : name;
+
+		if ( position is not null )
+			go.WorldPosition = ToVector3( position, "position" );
+
+		if ( rotation is not null )
+		{
+			if ( rotation.Length != 3 )
+				throw new ArgumentException( "'rotation' must be [pitch, yaw, roll]" );
+
+			go.WorldRotation = Rotation.From( rotation[0], rotation[1], rotation[2] );
+		}
+
+		go.Components.Create<CameraComponent>().FieldOfView = fieldOfView;
+
+		return Describe( go );
+	}
+
 	[McpTool( "gameobject_delete", "Deletes a GameObject (and its children).", ToolCategory.GameObject, Writes = true )]
 	public static object Delete( [Desc( "GameObject id or unique name" )] string gameObject )
 	{

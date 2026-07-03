@@ -25,6 +25,35 @@ public static class SceneTools
 		};
 	}
 
+	[McpTool( "scene_setup_basic", "Bootstraps a usable scene in the current scene: a ground plane (with a collider), a directional light, and a camera - so you can start building and playing immediately.", ToolCategory.Scene, Writes = true )]
+	public static object SetupBasic(
+		[Desc( "Ground size multiplier (scales a dev box)" )] float groundScale = 10f )
+	{
+		var session = RequireSession();
+		var box = Model.Load( "models/dev/box.vmdl" );
+
+		using var undo = session.UndoScope( "MCP: setup basic scene" ).WithGameObjectCreations().Push();
+
+		var ground = session.Scene.CreateObject();
+		ground.Name = "Ground";
+		ground.LocalScale = new Vector3( groundScale, groundScale, 1f );
+		ground.Components.Create<ModelRenderer>().Model = box;
+		ground.Components.Create<ModelCollider>().Model = box;
+
+		var sun = session.Scene.CreateObject();
+		sun.Name = "Sun";
+		sun.WorldRotation = Rotation.From( 60, 45, 0 );
+		sun.Components.Create<DirectionalLight>();
+
+		var cam = session.Scene.CreateObject();
+		cam.Name = "Camera";
+		cam.WorldPosition = new Vector3( -350, 0, 200 );
+		cam.WorldRotation = Rotation.From( 25, 0, 0 );
+		cam.Components.Create<CameraComponent>().FieldOfView = 70f;
+
+		return new { created = new[] { "Ground", "Sun", "Camera" }, note = "ground has a collider; a directional light and camera are set - ready to build and play" };
+	}
+
 	[McpTool( "scene_get_hierarchy", "Gets the scene's GameObject tree with ids, names and component types.", ToolCategory.Scene )]
 	public static object GetHierarchy(
 		[Desc( "How many levels deep to expand" )] int maxDepth = 4,

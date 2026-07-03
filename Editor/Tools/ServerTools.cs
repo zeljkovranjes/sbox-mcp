@@ -52,6 +52,15 @@ public static class ServerTools
 			{
 				// already on the editor main thread (batch itself was dispatched there)
 				var result = tool.Invoke( args );
+
+				// async tools (cloud_*) return a Task - can't be awaited on the
+				// main thread without freezing the editor, so reject clearly
+				if ( result is System.Threading.Tasks.Task )
+				{
+					results.Add( new { step = index, name, ok = false, error = "this tool is async and cannot run inside a batch - call it on its own" } );
+					if ( !continueOnError ) break; else continue;
+				}
+
 				results.Add( new { step = index, name, ok = true, result } );
 			}
 			catch ( Exception e )

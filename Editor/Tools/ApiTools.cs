@@ -59,6 +59,21 @@ public static class ApiTools
 			?? throw new InvalidOperationException( $"No type '{typeName}' - use api_search to find it" );
 
 		var type = desc.TargetType;
+
+		// enums: the useful thing is the list of valid values (what to pass to
+		// component_set_property for an enum-typed field)
+		if ( type.IsEnum )
+		{
+			return new
+			{
+				name = desc.Name,
+				fullName = type.FullName,
+				kind = "enum",
+				values = Enum.GetNames( type ),
+				note = "Pass one of these value names as a string."
+			};
+		}
+
 		// properties INCLUDE inherited ones - component_set_property accepts
 		// inherited members like Enabled/WorldPosition, so listing only declared
 		// members would mislead. Methods stay declared-only to avoid Object noise.
@@ -68,11 +83,17 @@ public static class ApiTools
 		var properties = type.GetProperties( propFlags )
 			.Where( p => p.GetIndexParameters().Length == 0 )
 			.GroupBy( p => p.Name ).Select( g => g.First() ) // dedupe overridden/shadowed
-			.Select( p => new
+			.Select( p =>
 			{
-				name = p.Name,
-				type = FriendlyType( p.PropertyType ),
-				access = (p.CanRead ? "get" : "") + (p.CanWrite ? " set" : "")
+				var pt = Nullable.GetUnderlyingType( p.PropertyType ) ?? p.PropertyType;
+				return new
+				{
+					name = p.Name,
+					type = FriendlyType( p.PropertyType ),
+					access = (p.CanRead ? "get" : "") + (p.CanWrite ? " set" : ""),
+					// inline enum options so the AI knows valid values to set
+					enumValues = pt.IsEnum ? Enum.GetNames( pt ) : null
+				};
 			} )
 			.OrderBy( p => p.name )
 			.ToArray();

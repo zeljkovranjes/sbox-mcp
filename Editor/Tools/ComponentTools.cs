@@ -158,10 +158,16 @@ public static class ComponentTools
 		// Component / GameObject reference properties don't round-trip through
 		// JSON reliably in the editor (ComponentReference.Resolve needs the
 		// active scene) - resolve the target ourselves and set it directly.
-		if ( propInfo is not null && propInfo.CanWrite
-			&& (typeof( Component ).IsAssignableFrom( propInfo.PropertyType ) || propInfo.PropertyType == typeof( GameObject )) )
+		if ( propInfo is not null && propInfo.CanWrite && IsReferenceType( propInfo.PropertyType ) )
 		{
 			propInfo.SetValue( component, ResolveReference( value, propInfo.PropertyType ) );
+			return;
+		}
+
+		// lists/arrays of references (waypoints, targets...) - resolve each element
+		if ( propInfo is not null && propInfo.CanWrite && ReferenceElementType( propInfo.PropertyType ) is System.Type elementType )
+		{
+			propInfo.SetValue( component, ResolveReferenceCollection( value, propInfo.PropertyType, elementType ) );
 			return;
 		}
 
@@ -174,6 +180,40 @@ public static class ComponentTools
 		minimal[key] = value.ValueKind == JsonValueKind.Null ? null : JsonNode.Parse( value.GetRawText() );
 
 		component.DeserializeImmediately( minimal );
+	}
+
+	static bool IsReferenceType( System.Type t ) =>
+		typeof( Component ).IsAssignableFrom( t ) || t == typeof( GameObject );
+
+	/// <summary>Element type if <paramref name="t"/> is a List&lt;ref&gt; or ref[], else null.</summary>
+	static System.Type ReferenceElementType( System.Type t )
+	{
+		if ( t.IsArray && IsReferenceType( t.GetElementType() ) )
+			return t.GetElementType();
+
+		if ( t.IsGenericType && t.GetGenericTypeDefinition() == typeof( List<> ) && IsReferenceType( t.GetGenericArguments()[0] ) )
+			return t.GetGenericArguments()[0];
+
+		return null;
+	}
+
+	static object ResolveReferenceCollection( JsonElement value, System.Type collectionType, System.Type elementType )
+	{
+		if ( value.ValueKind != JsonValueKind.Array )
+			throw new ArgumentException( $"This property is a list of references - pass a JSON array of ids (or 'goId:ComponentType')" );
+
+		var items = value.EnumerateArray().Select( e => ResolveReference( e, elementType ) ).ToList();
+
+		if ( collectionType.IsArray )
+		{
+			var arr = Array.CreateInstance( elementType, items.Count );
+			for ( var i = 0; i < items.Count; i++ ) arr.SetValue( items[i], i );
+			return arr;
+		}
+
+		var list = (System.Collections.IList)Activator.CreateInstance( collectionType );
+		foreach ( var item in items ) list.Add( item );
+		return list;
 	}
 
 	/// <summary>

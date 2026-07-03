@@ -62,9 +62,7 @@ named tools below, four universal mechanisms give total reach:
 - **Any type** — `api_search` / `api_get_type` reflect the whole API; `api_reference` exports the full current-build reference and auto-refreshes when you update s&box.
 
 So "add a player" isn't a special tool — the AI finds `PlayerController` with
-`api_search`, reads its fields with `api_get_type`, and composes it. See
-[CAPABILITIES.md](CAPABILITIES.md) for the full subsystem-by-subsystem map and
-the (few) honest limits.
+`api_search`, reads its fields with `api_get_type`, and composes it.
 
 ## Tool families
 

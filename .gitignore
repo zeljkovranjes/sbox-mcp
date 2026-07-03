@@ -9,6 +9,9 @@ dev/
 # Local API reference dump (not published)
 api_surface.txt
 
+# Local capabilities doc (not published)
+CAPABILITIES.md
+
 # Build artifacts
 bin/
 obj/

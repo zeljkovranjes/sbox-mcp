@@ -11,7 +11,7 @@ namespace SboxMcp.Tools;
 
 public static class EditorTools
 {
-	[McpTool( "editor_get_logs", "Reads recent editor console output (newest first).", ToolCategory.Editor )]
+	[McpTool( "editor_get_logs", "Reads recent editor console output (newest first) - compile diagnostics, editor warnings/errors. NOTE: game-side Log.* emitted while play mode is running may not all appear here; to inspect play-mode state, read component values with component_get_property / get_component_property (they reflect the live play scene).", ToolCategory.Editor )]
 	public static object GetLogs(
 		int count = 100,
 		[Desc( "Minimum severity: trace, info, warning or error" )] string minSeverity = null )

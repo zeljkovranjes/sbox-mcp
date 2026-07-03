@@ -11,7 +11,7 @@ code**, and expects the reverse: bind only to the public facade described below.
 
 An s&box editor library (menu: **View → Animation Editor**) for authoring model
 animations (keyframes, IK, curves, anim events, attachments) and compiling them to
-playable `.vmdl` sequences. Library ident: TBD at publish — detect by the presence
+playable `.vmdl` sequences. Library ident: TBD at publish - detect by the presence
 of the facade type below rather than by folder/package name.
 
 ## Out-of-box baseline (zero work on your side)
@@ -37,7 +37,7 @@ guaranteed baseline and it will keep working.
 ## Ideal end state: a first-class `animeditor_` tool family
 
 Same pattern as your `retargeter_` family (enabled when the library is installed,
-shown disabled otherwise). Planned facade surface to wrap — final signatures will
+shown disabled otherwise). Planned facade surface to wrap - final signatures will
 be in the shipped library's `AnimationEditorApi`; treat this list as the contract
 scope, discover exact members via your own `api_get_type` at runtime:
 
@@ -47,21 +47,21 @@ scope, discover exact members via your own `api_get_type` at runtime:
 | Transport | `Play()`, `Pause()`, `SeekFrame(int)`, `GetFrame()` |
 | Authoring | `SetBonePose(bone, transformJson)`, `AddKeyframe(track, frame, valueJson)`, `RemoveKeyframe(track, frame)`, `SetCurve(track, curveJson)`, `AddEvent(eventJson)`, `AddAttachment(attachmentJson)`, `MirrorPose()`, `ApplyLibraryPose(name, blend)` |
 | Output | `ExportAndCompile()` → JSON result incl. compile log; `Validate()` → JSON issues |
-| Bridges | `RetargetAnimation(argsJson)` (needs `humanoid-retargeter` installed), `AutoRigModel(argsJson)` (needs `auto-rigger`), `GenerateFromText(prompt, optionsJson)` (only when the experimental AI plugin is enabled — check `GetCapabilities()` first) |
-| Vision | `CaptureViewport(path)` — screenshot of the editor's own viewport (your `editor_screenshot` won't see our widget's scene) |
+| Bridges | `RetargetAnimation(argsJson)` (needs `humanoid-retargeter` installed), `AutoRigModel(argsJson)` (needs `auto-rigger`), `GenerateFromText(prompt, optionsJson)` (only when the experimental AI plugin is enabled - check `GetCapabilities()` first) |
+| Vision | `CaptureViewport(path)` - screenshot of the editor's own viewport (your `editor_screenshot` won't see our widget's scene) |
 
 ## Requirements on your side for a clean integration
 
 1. **Detection:** feature-detect the `AnimationEditorApi` type via TypeLibrary and
    gate the family on it, exactly like `retargeter_`. Check `Version` (semver
    major = breaking) and `GetCapabilities()` before exposing optional tools
-   (AI generation, bridges) — they may legitimately be absent/disabled.
+   (AI generation, bridges) - they may legitimately be absent/disabled.
 2. **Permission classes:** authoring/output methods are **writes** (they mutate
    the user's project and are undoable via the editor undo scope we register);
    `Get*`/`Capture*` are reads. Map them into your Approve-writes mode.
 3. **Error convention:** facade methods return structured JSON errors
    (`{ "ok": false, "error": "...", "detail": ... }`) instead of throwing across
-   the boundary — surface `error` verbatim to the AI client.
+   the boundary - surface `error` verbatim to the AI client.
 4. **No internals:** do not reflect into non-public Animation Editor types or
    bypass the facade with `invoke_static` recipes in your `help` content; the
    facade is the only stable surface. Anything missing from it is a feature
@@ -76,7 +76,7 @@ The `animeditor_` family is implemented in `Editor/Tools/AnimEditorTools.cs`,
 bound only to `PointlessAI.AnimationEditor.AnimationEditorApi` by reflection
 (no internals touched). It is **feature-gated on the facade type's presence**,
 so every `animeditor_*` tool currently shows **"Not Installed"** in the tool
-browser and is rejected on call — it will light up automatically the moment a
+browser and is rejected on call - it will light up automatically the moment a
 build exposing `AnimationEditorApi` is installed in the project (re-resolved
 every 5s, no restart needed).
 
@@ -93,10 +93,10 @@ version / capabilities), plus `new_document`, `open_document`, `save_document`,
 
 Contract handling: each tool calls the facade method **by name, matched on
 argument count**, so minor signature drift is tolerated; if a method is
-missing the tool returns a clear "API contract may have changed — use
+missing the tool returns a clear "API contract may have changed - use
 api_get_type 'AnimationEditorApi'" message. When your v1 ships, if any final
 signature differs materially from the indicative table above, just update this
-note and I'll adjust the wrapper — no rush, the gating keeps everything safe
+note and I'll adjust the wrapper - no rush, the gating keeps everything safe
 until then.
 
 ## Sequencing

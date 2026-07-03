@@ -29,7 +29,7 @@ public static class GraphTools
 		var asset = AssetSystem.FindByPath( path )
 			?? throw new InvalidOperationException( $"No animgraph at '{path}' - use asset_search with assetType 'vanmgrph'" );
 
-		var text = File.ReadAllText( asset.GetSourceFile( true ) );
+		var text = File.ReadAllText( RequireSourceFile( asset ) );
 
 		if ( raw )
 			return new { path = asset.Path, format = "kv3", content = text };
@@ -80,7 +80,7 @@ public static class GraphTools
 		var asset = AssetSystem.FindByPath( path )
 			?? throw new InvalidOperationException( $"No shadergraph at '{path}' - use asset_search with assetType 'shdrgrph'" );
 
-		return new { path = asset.Path, content = File.ReadAllText( asset.GetSourceFile( true ) ) };
+		return new { path = asset.Path, content = File.ReadAllText( RequireSourceFile( asset ) ) };
 	}
 
 	[McpTool( "shadergraph_set", "Writes full JSON content to a .shdrgrph (creating it if missing), then compiles. Read an existing graph first to learn the node schema.", ToolCategory.ShaderGraph, Writes = true )]
@@ -98,7 +98,7 @@ public static class GraphTools
 		var asset = AssetSystem.FindByPath( path )
 			?? throw new InvalidOperationException( $"No shadergraph at '{path}' - use asset_search with assetType 'shdrgrph'" );
 
-		var doc = JsonDocument.Parse( File.ReadAllText( asset.GetSourceFile( true ) ) );
+		var doc = JsonDocument.Parse( File.ReadAllText( RequireSourceFile( asset ) ) );
 
 		if ( !doc.RootElement.TryGetProperty( "nodes", out var nodes ) )
 			return new { path = asset.Path, nodes = Array.Empty<object>() };
@@ -131,7 +131,7 @@ public static class GraphTools
 		var asset = AssetSystem.FindByPath( path )
 			?? throw new InvalidOperationException( $"No action graph at '{path}' - use asset_search with assetType 'action'" );
 
-		return new { path = asset.Path, content = File.ReadAllText( asset.GetSourceFile( true ) ) };
+		return new { path = asset.Path, content = File.ReadAllText( RequireSourceFile( asset ) ) };
 	}
 
 	[McpTool( "actiongraph_set", "Writes full JSON content to an action graph asset (creating it if missing), then compiles. Read an existing graph first to learn the node schema.", ToolCategory.ActionGraph, Writes = true )]

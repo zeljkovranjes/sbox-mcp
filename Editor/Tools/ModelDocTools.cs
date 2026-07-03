@@ -57,7 +57,7 @@ public static class ModelDocTools
 		var asset = AssetSystem.FindByPath( vmdlPath )
 			?? throw new InvalidOperationException( $"No model at '{vmdlPath}' - use asset_search with assetType 'vmdl'" );
 
-		var text = File.ReadAllText( asset.GetSourceFile( true ) );
+		var text = File.ReadAllText( RequireSourceFile( asset ) );
 
 		if ( raw )
 			return new { path = asset.Path, format = "kv3", content = text };

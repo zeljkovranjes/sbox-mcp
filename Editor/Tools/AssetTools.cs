@@ -16,6 +16,19 @@ public static class AssetTools
 
 	internal static string ResolveInProject( string path ) => PathJail.Resolve( ProjectRoot, path );
 
+	/// <summary>Returns an asset's editable source-file path, or throws a clear
+	/// error for mounted/engine/compiled-only assets that have none (avoids the
+	/// cryptic "path cannot be empty" from File.ReadAllText on a null source).</summary>
+	public static string RequireSourceFile( Asset asset )
+	{
+		var source = asset.GetSourceFile( true );
+		if ( string.IsNullOrEmpty( source ) || !File.Exists( source ) )
+			throw new InvalidOperationException(
+				$"'{asset.Path}' has no editable local source - it's a mounted/engine or compiled-only asset. Duplicate it into your project with asset_duplicate to edit it." );
+
+		return source;
+	}
+
 	/// <summary>
 	/// Resolves a path for a NEW asset file. Plain asset paths like
 	/// 'models/new.vmdl' land in the project's Assets mount (where the asset

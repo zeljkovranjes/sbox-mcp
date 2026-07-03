@@ -15,14 +15,14 @@ public static class ComponentTools
 {
 	[McpTool( "component_list_types", "Searches available component types (ModelRenderer, Rigidbody, custom components...).", ToolCategory.Component )]
 	public static object ListTypes(
-		[Desc( "Name filter (case-insensitive substring); omit for all" )] string search = null,
+		[Desc( "Name filter (case-insensitive substring); omit for all" )] string query = null,
 		int max = 50 )
 	{
 		var types = EditorTypeLibrary.GetTypes<Component>()
 			.Where( t => !t.IsAbstract )
-			.Where( t => search is null
-				|| t.Name.Contains( search, StringComparison.OrdinalIgnoreCase )
-				|| (t.FullName?.Contains( search, StringComparison.OrdinalIgnoreCase ) ?? false) )
+			.Where( t => query is null
+				|| t.Name.Contains( query, StringComparison.OrdinalIgnoreCase )
+				|| (t.FullName?.Contains( query, StringComparison.OrdinalIgnoreCase ) ?? false) )
 			.OrderBy( t => t.Name )
 			.Take( max )
 			.Select( t => new { name = t.Name, fullName = t.FullName, title = t.Title, group = t.Group } )

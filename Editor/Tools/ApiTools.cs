@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using static Sandbox.Internal.GlobalToolsNamespace;
 using SboxMcp.Registry;
 
@@ -95,8 +98,156 @@ public static class ApiTools
 		};
 	}
 
+	/// <summary>Where the auto-maintained reference and its version marker live.</summary>
+	const string ReferenceFile = ".sbox-mcp/api_surface.txt";
+	const string VersionFile = ".sbox-mcp/api_version.txt";
+
+	[McpTool( "api_version", "Reports the running editor's build version. The API reference auto-regenerates when this changes, so information is always current.", ToolCategory.Editor )]
+	public static object Version()
+	{
+		var (key, display) = EngineBuild();
+		var cached = ReadCachedVersion();
+
+		return new
+		{
+			build = display,
+			versionKey = key,
+			referenceUpToDate = cached == key,
+			cachedBuild = cached,
+			note = cached == key
+				? "The exported API reference matches this build."
+				: "The API reference is stale or missing - call api_reference to refresh it."
+		};
+	}
+
+	[McpTool( "api_reference", "Returns the path to a complete API reference for the CURRENT editor build, regenerating it automatically if the editor was updated since it was last written. This is the always-up-to-date full reference; api_search/api_get_type are the live per-query lookups.", ToolCategory.Editor, Writes = true )]
+	public static object Reference(
+		[Desc( "Force a fresh regeneration even if the build is unchanged" )] bool force = false )
+	{
+		var (key, display) = EngineBuild();
+		var absoluteRef = AssetTools.ResolveInProject( ReferenceFile );
+		var regenerated = false;
+
+		if ( force || ReadCachedVersion() != key || !File.Exists( absoluteRef ) )
+		{
+			var (types, bytes) = WriteDump( absoluteRef, null, key, display );
+			File.WriteAllText( AssetTools.ResolveInProject( VersionFile ), key );
+			regenerated = true;
+
+			return new { path = ReferenceFile, build = display, types, bytes, regenerated,
+				note = "Regenerated for the current build. Read it with asset_read_raw or code_read_file." };
+		}
+
+		return new { path = ReferenceFile, build = display, regenerated,
+			note = "Already current for this build. Read it with asset_read_raw or code_read_file." };
+	}
+
+	static string ReadCachedVersion()
+	{
+		try
+		{
+			var p = AssetTools.ResolveInProject( VersionFile );
+			return File.Exists( p ) ? File.ReadAllText( p ).Trim() : null;
+		}
+		catch { return null; }
+	}
+
+	/// <summary>(stable key, human display) for the running editor build.</summary>
+	static (string Key, string Display) EngineBuild()
+	{
+		// the engine assembly version changes every build - the reliable signal
+		var asmVersion = typeof( Sandbox.Component ).Assembly.GetName().Version?.ToString() ?? "unknown";
+
+		string buildDate = null;
+		try
+		{
+			// Sandbox.Standalone.BuildDate when present; reflected so a missing/
+			// internal member can never break the tool
+			var standalone = typeof( Sandbox.Component ).Assembly.GetType( "Sandbox.Standalone" );
+			if ( standalone?.GetProperty( "BuildDate", BindingFlags.Public | BindingFlags.Static )?.GetValue( null ) is DateTime dt && dt.Year > 2000 )
+				buildDate = dt.ToString( "yyyy-MM-dd" );
+		}
+		catch { /* ignore */ }
+
+		var key = buildDate is null ? asmVersion : $"{asmVersion}+{buildDate}";
+		var display = buildDate is null ? asmVersion : $"{asmVersion} (built {buildDate})";
+		return (key, display);
+	}
+
+	[McpTool( "api_dump", "Exports the ENTIRE live API surface (every public type and member from the loaded s&box + project assemblies) to a text file you choose. Always reflects the current installed build. Warning: large (~1MB). For the auto-maintained reference, prefer api_reference.", ToolCategory.Editor, Writes = true )]
+	public static object Dump(
+		[Desc( "Output path, e.g. 'api_surface.txt' (project-relative)" )] string path = "api_surface.txt",
+		[Desc( "Only namespaces starting with this, e.g. 'Sandbox'; omit for everything" )] string namespaceFilter = null )
+	{
+		var (key, display) = EngineBuild();
+		var absolute = AssetTools.ResolveInProject( path );
+		var (types, bytes) = WriteDump( absolute, namespaceFilter, key, display );
+
+		return new { written = path, build = display, types, bytes, note = "Complete current-build API reference." };
+	}
+
+	static (int Types, int Bytes) WriteDump( string absolutePath, string namespaceFilter, string versionKey, string versionDisplay )
+	{
+		var sb = new StringBuilder();
+		sb.AppendLine( "# s&box API surface - LIVE reflection dump from the running editor" );
+		sb.Append( "# build: " ).AppendLine( versionDisplay );
+		sb.Append( "# versionKey: " ).AppendLine( versionKey );
+		sb.AppendLine( "# format: TYPE <kind> <fullname>[ : base] then indented members (P property, M method, F field, E event)" );
+
+		var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+			.Where( a => !a.IsDynamic )
+			.Where( a =>
+			{
+				var n = a.GetName().Name ?? "";
+				return n.StartsWith( "Sandbox", StringComparison.Ordinal )
+					|| n.StartsWith( "package.", StringComparison.Ordinal )
+					|| n.StartsWith( "Facepunch", StringComparison.Ordinal );
+			} );
+
+		var typeCount = 0;
+		const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+		foreach ( var type in assemblies.SelectMany( SafeTypes ).OrderBy( t => t.FullName, StringComparer.Ordinal ) )
+		{
+			if ( namespaceFilter is not null && !(type.Namespace?.StartsWith( namespaceFilter, StringComparison.OrdinalIgnoreCase ) ?? false) )
+				continue;
+
+			var kind = type.IsEnum ? "enum" : type.IsInterface ? "interface" : type.IsValueType ? "struct" : "class";
+			var baseStr = type.BaseType is not null && type.BaseType != typeof( object ) && !type.IsEnum
+				? $" : {type.BaseType.FullName}" : "";
+			sb.Append( "TYPE " ).Append( kind ).Append( ' ' ).Append( type.FullName ).AppendLine( baseStr );
+			typeCount++;
+
+			foreach ( var p in type.GetProperties( flags ).Where( p => p.GetIndexParameters().Length == 0 ) )
+				sb.Append( "  P " ).Append( FriendlyType( p.PropertyType ) ).Append( ' ' ).Append( p.Name )
+					.Append( ' ' ).Append( p.CanRead ? "get;" : "" ).AppendLine( p.CanWrite ? "set;" : "" );
+
+			foreach ( var m in type.GetMethods( flags ).Where( m => !m.IsSpecialName ) )
+				sb.Append( "  M " ).Append( FriendlyType( m.ReturnType ) ).Append( ' ' ).Append( m.Name )
+					.Append( '(' ).Append( string.Join( ", ", m.GetParameters().Select( x => $"{FriendlyType( x.ParameterType )} {x.Name}" ) ) ).AppendLine( ")" );
+
+			foreach ( var f in type.GetFields( flags ).Where( f => !f.IsSpecialName ) )
+				sb.Append( "  F " ).Append( FriendlyType( f.FieldType ) ).Append( ' ' ).AppendLine( f.Name );
+
+			foreach ( var e in type.GetEvents( flags ) )
+				sb.Append( "  E " ).Append( FriendlyType( e.EventHandlerType ) ).Append( ' ' ).AppendLine( e.Name );
+		}
+
+		Directory.CreateDirectory( Path.GetDirectoryName( absolutePath ) );
+		File.WriteAllText( absolutePath, sb.ToString() );
+
+		return (typeCount, sb.Length);
+	}
+
+	static IEnumerable<Type> SafeTypes( Assembly assembly )
+	{
+		try { return assembly.GetExportedTypes(); }
+		catch { return Array.Empty<Type>(); }
+	}
+
 	static string FriendlyType( Type t )
 	{
+		if ( t is null ) return "?";
 		if ( t == typeof( void ) ) return "void";
 		var underlying = Nullable.GetUnderlyingType( t );
 		if ( underlying is not null ) return FriendlyType( underlying ) + "?";

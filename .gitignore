@@ -12,6 +12,9 @@ api_surface.txt
 # Local capabilities doc (not published)
 CAPABILITIES.md
 
+# Local changelog (not published)
+CHANGELOG.md
+
 # Build artifacts
 bin/
 obj/

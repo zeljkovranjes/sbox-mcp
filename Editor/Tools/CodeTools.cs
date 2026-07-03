@@ -11,8 +11,18 @@ namespace SboxMcp.Tools;
 
 public static class CodeTools
 {
-	static readonly string[] SkippedDirs = { "\\obj\\", "\\bin\\", "\\.git\\", "/obj/", "/bin/", "/.git/" };
+	static readonly string[] SkippedDirs = { "\\obj\\", "\\bin\\", "/obj/", "/bin/" };
 	static readonly string[] SourceExtensions = { ".cs", ".razor", ".scss", ".shader", ".hlsl" };
+
+	/// <summary>Skip build output and any dot-directory (.git, .sbox, .removed-libraries...).</summary>
+	static bool IsSkipped( string fullPath )
+	{
+		if ( SkippedDirs.Any( s => fullPath.Contains( s, StringComparison.OrdinalIgnoreCase ) ) )
+			return true;
+
+		// any path segment starting with '.'
+		return fullPath.Replace( '\\', '/' ).Split( '/' ).Any( seg => seg.StartsWith( '.' ) && seg.Length > 1 );
+	}
 
 	[McpTool( "code_list_files", "Lists source files in the project: C# (.cs), UI (.razor/.scss) and shaders. Saving a file hot-reloads automatically.", ToolCategory.Code )]
 	public static object ListFiles(
@@ -27,7 +37,7 @@ public static class CodeTools
 
 		var files = Directory.EnumerateFiles( searchRoot, "*.*", SearchOption.AllDirectories )
 			.Where( f => SourceExtensions.Contains( Path.GetExtension( f ), StringComparer.OrdinalIgnoreCase ) )
-			.Where( f => !SkippedDirs.Any( s => f.Contains( s, StringComparison.OrdinalIgnoreCase ) ) )
+			.Where( f => !IsSkipped( f ) )
 			.Where( f => includeLibraries || !f.Contains( Path.DirectorySeparatorChar + "Libraries" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase ) )
 			.Select( f => Path.GetRelativePath( root, f ).Replace( '\\', '/' ) )
 			.OrderBy( f => f )
@@ -64,7 +74,7 @@ public static class CodeTools
 		{
 			if ( !SourceExtensions.Contains( Path.GetExtension( file ), StringComparer.OrdinalIgnoreCase ) )
 				continue;
-			if ( SkippedDirs.Any( s => file.Contains( s, StringComparison.OrdinalIgnoreCase ) ) )
+			if ( IsSkipped( file ) )
 				continue;
 
 			var rel = Path.GetRelativePath( root, file ).Replace( '\\', '/' );

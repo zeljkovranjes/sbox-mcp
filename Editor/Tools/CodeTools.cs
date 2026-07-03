@@ -202,6 +202,17 @@ public static class CodeTools
 		return new { invoked = $"{typeName}.{methodName}", result = result?.ToString() ?? "null" };
 	}
 
+	[McpTool( "code_delete_file", "Deletes a project source file (e.g. remove a component you no longer need). Jailed to the project; not undoable.", ToolCategory.Code, Writes = true )]
+	public static object DeleteFile( [Desc( "Path relative to project root, e.g. 'Code/OldThing.cs'" )] string path )
+	{
+		var absolute = ResolveInProject( path );
+		if ( !File.Exists( absolute ) )
+			throw new InvalidOperationException( $"No file at '{path}' - use code_list_files" );
+
+		File.Delete( absolute );
+		return new { deleted = path, note = "the editor will hot-reload; check code_get_compile_errors for references you may need to remove" };
+	}
+
 	[McpTool( "code_get_compile_errors", "Gets recent compiler errors and warnings from the editor console.", ToolCategory.Code )]
 	public static object GetCompileErrors( int max = 50 )
 	{

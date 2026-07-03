@@ -126,6 +126,27 @@ public static class QueryTools
 		return new { gameObject = go.Name, tags = go.Tags.TryGetAll().ToArray() };
 	}
 
+	[McpTool( "gameobject_snap_to_grid", "Snaps a GameObject's world position to a grid (rounds each axis to the nearest multiple).", ToolCategory.GameObject, Writes = true )]
+	public static object SnapToGrid(
+		[Desc( "GameObject id or unique name" )] string gameObject,
+		[Desc( "Grid size to snap to" )] float gridSize = 16f )
+	{
+		if ( gridSize <= 0 )
+			throw new ArgumentException( "gridSize must be positive" );
+
+		var session = RequireSession();
+		var go = FindGameObject( gameObject );
+
+		using var undo = session.UndoScope( "MCP: snap to grid" ).WithGameObjectChanges( go, GameObjectUndoFlags.Properties ).Push();
+		var p = go.WorldPosition;
+		go.WorldPosition = new Vector3(
+			MathF.Round( p.x / gridSize ) * gridSize,
+			MathF.Round( p.y / gridSize ) * gridSize,
+			MathF.Round( p.z / gridSize ) * gridSize );
+
+		return new { gameObject = go.Name, position = V( go.WorldPosition ) };
+	}
+
 	[McpTool( "gameobject_distance", "Measures the distance between two GameObjects.", ToolCategory.GameObject )]
 	public static object Distance(
 		[Desc( "First GameObject id or unique name" )] string a,

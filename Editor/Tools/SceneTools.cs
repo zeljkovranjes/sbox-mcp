@@ -109,6 +109,41 @@ public static class SceneTools
 		};
 	}
 
+	static Sandbox.Navigation.NavMesh RequireNav()
+	{
+		var nav = RequireScene().NavMesh;
+		if ( nav is null || !nav.IsEnabled )
+			throw new InvalidOperationException( "The scene's NavMesh is not enabled - call navmesh_generate first" );
+
+		return nav;
+	}
+
+	[McpTool( "navmesh_random_point", "Returns a random reachable point on the scene's NavMesh - for AI wander targets. Optionally sampled near a position within a radius. Requires navmesh_generate first.", ToolCategory.Scene )]
+	public static object NavMeshRandomPoint(
+		[Desc( "Center to sample near [x, y, z]; omit for anywhere on the navmesh" )] float[] near = null,
+		[Desc( "Sample radius around 'near'" )] float radius = 500f )
+	{
+		var nav = RequireNav();
+		var point = near is not null ? nav.GetRandomPoint( ToVector3( near, "near" ), radius ) : nav.GetRandomPoint();
+
+		return point is null
+			? new { found = false, point = (float[])null }
+			: new { found = true, point = V( point.Value ) };
+	}
+
+	[McpTool( "navmesh_closest_point", "Snaps a world point to the nearest point on the scene's NavMesh within a radius (clamp a spawn/target onto walkable ground). Requires navmesh_generate first.", ToolCategory.Scene )]
+	public static object NavMeshClosestPoint(
+		[Desc( "World point [x, y, z]" )] float[] position,
+		[Desc( "Search radius" )] float radius = 200f )
+	{
+		var nav = RequireNav();
+		var point = nav.GetClosestPoint( ToVector3( position, "position" ), radius );
+
+		return point is null
+			? new { found = false, point = (float[])null }
+			: new { found = true, point = V( point.Value ) };
+	}
+
 	[McpTool( "scene_get_hierarchy", "Gets the scene's GameObject tree with ids, names and component types.", ToolCategory.Scene )]
 	public static object GetHierarchy(
 		[Desc( "How many levels deep to expand" )] int maxDepth = 4,

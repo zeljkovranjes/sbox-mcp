@@ -61,6 +61,21 @@ public static class ContentTools
 		return new { played = soundEvent };
 	}
 
+	[McpTool( "sound_play_at", "Plays a sound event at a 3D world position (spatialized) to preview positional audio.", ToolCategory.Asset )]
+	public static object SoundPlayAt(
+		[Desc( "Sound event asset path" )] string soundEvent,
+		[Desc( "World position [x, y, z]" )] float[] position )
+	{
+		if ( AssetSystem.FindByPath( soundEvent ) is null )
+			throw new InvalidOperationException( $"No sound event at '{soundEvent}' - use asset_search with assetType 'sound'" );
+
+		if ( position is null || position.Length != 3 )
+			throw new ArgumentException( "'position' must be [x, y, z]" );
+
+		Sound.Play( soundEvent, new Vector3( position[0], position[1], position[2] ), 0f );
+		return new { played = soundEvent, at = position };
+	}
+
 	[McpTool( "texture_write", "Saves base64-encoded image bytes (png/jpg/tga) as a texture asset - pipe in generated or downloaded images, then use them in material_create.", ToolCategory.Asset, Writes = true )]
 	public static object TextureWrite(
 		[Desc( "Output path ending in .png/.jpg/.tga, e.g. 'textures/crate_color.png'" )] string path,

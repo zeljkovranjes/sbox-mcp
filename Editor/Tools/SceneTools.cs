@@ -57,6 +57,58 @@ public static class SceneTools
 		return new { created = new[] { "Ground", "Sun", "Camera" }, note = "ground has a collider; a directional light and camera are set - ready to build and play" };
 	}
 
+	[McpTool( "navmesh_generate", "Enables and bakes the scene's NavMesh from its static/ground colliders so NPCs and enemies can pathfind. Set the agent size to match your characters. Run after the level geometry exists.", ToolCategory.Scene, Writes = true )]
+	public static object NavMeshGenerate(
+		[Desc( "Agent radius (character half-width)" )] float agentRadius = 16f,
+		[Desc( "Agent height" )] float agentHeight = 72f,
+		[Desc( "Max step height the agent can climb" )] float agentStepSize = 18f )
+	{
+		var scene = RequireScene();
+		var nav = scene.NavMesh
+			?? throw new InvalidOperationException( "This scene has no NavMesh object" );
+
+		nav.IsEnabled = true;
+		nav.AgentRadius = agentRadius;
+		nav.AgentHeight = agentHeight;
+		nav.AgentStepSize = agentStepSize;
+		nav.Generate( scene.PhysicsWorld );
+
+		return new
+		{
+			enabled = true,
+			agentRadius,
+			agentHeight,
+			isGenerating = nav.IsGenerating,
+			note = "generation may finish asynchronously; query paths with navmesh_find_path"
+		};
+	}
+
+	[McpTool( "navmesh_find_path", "Finds a navigation path between two world points on the scene's NavMesh (for NPC/enemy movement) - returns the waypoints. Requires navmesh_generate first.", ToolCategory.Scene )]
+	public static object NavMeshFindPath(
+		[Desc( "Start point [x, y, z]" )] float[] from,
+		[Desc( "Destination point [x, y, z]" )] float[] to )
+	{
+		var scene = RequireScene();
+		var nav = scene.NavMesh;
+		if ( nav is null || !nav.IsEnabled )
+			throw new InvalidOperationException( "The scene's NavMesh is not enabled - call navmesh_generate first" );
+
+		var path = nav.CalculatePath( new Sandbox.Navigation.CalculatePathRequest
+		{
+			Start = ToVector3( from, "from" ),
+			Target = ToVector3( to, "to" )
+		} );
+
+		var points = path.Points is null ? Array.Empty<float[]>() : path.Points.Select( p => V( p.Position ) ).ToArray();
+		return new
+		{
+			found = path.Status == Sandbox.Navigation.NavMeshPathStatus.Complete,
+			status = path.Status.ToString(),
+			waypoints = points.Length,
+			points
+		};
+	}
+
 	[McpTool( "scene_get_hierarchy", "Gets the scene's GameObject tree with ids, names and component types.", ToolCategory.Scene )]
 	public static object GetHierarchy(
 		[Desc( "How many levels deep to expand" )] int maxDepth = 4,

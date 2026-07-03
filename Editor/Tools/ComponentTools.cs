@@ -283,17 +283,27 @@ public static class ComponentTools
 		return new { on = component.GetType().Name, property = match.Key, value = match.Value };
 	}
 
-	[McpTool( "model_get_bone", "Gets a bone of a SkinnedModelRenderer as a GameObject you can parent things to (e.g. attach a weapon to 'hand_R') plus its live world transform.", ToolCategory.Component )]
+	[McpTool( "model_get_bone", "Gets a bone of a SkinnedModelRenderer as a GameObject you can parent things to (e.g. attach a weapon to a hand bone) plus its world transform. Omit boneName to list all the model's bone names first.", ToolCategory.Component, Writes = true )]
 	public static object GetBone(
 		[Desc( "GameObject id or unique name (must have a SkinnedModelRenderer)" )] string gameObject,
-		[Desc( "Bone name, e.g. 'hand_R', 'head', 'spine_2'" )] string boneName )
+		[Desc( "Bone name; omit to list all bones on the model" )] string boneName = null )
 	{
 		var go = FindGameObject( gameObject );
 		var renderer = go.Components.Get<SkinnedModelRenderer>()
 			?? throw new InvalidOperationException( $"'{go.Name}' has no SkinnedModelRenderer" );
 
+		var bones = renderer.Model?.Bones?.AllBones
+			?? throw new InvalidOperationException( "The renderer has no model / bones loaded" );
+
+		if ( string.IsNullOrEmpty( boneName ) )
+			return new { boneCount = bones.Count, bones = bones.Select( b => b.Name ).ToArray() };
+
+		// bone GameObjects only exist when CreateBoneObjects is enabled
+		renderer.CreateBoneObjects = true;
+
 		var boneGo = renderer.GetBoneObject( boneName )
-			?? throw new InvalidOperationException( $"No bone '{boneName}' on this model - bone names vary; common ones are 'head', 'hand_R', 'hand_L', 'pelvis'" );
+			?? throw new InvalidOperationException(
+				$"No bone '{boneName}'. Available: {string.Join( ", ", bones.Select( b => b.Name ).Take( 40 ) )}" );
 
 		return new { bone = boneName, gameObjectId = boneGo.Id, worldPosition = V( boneGo.WorldPosition ), worldRotation = A( boneGo.WorldRotation ) };
 	}

@@ -16,6 +16,7 @@ public enum ToolCategory
 	Code,
 	Editor,
 	Retargeter,
+	AnimEditor,
 	Cloud,
 	Imported
 }

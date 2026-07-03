@@ -60,6 +60,16 @@ public static class HelpTools
 			+ "4. Solid? Also component_add 'ModelCollider' with the same Model.\n"
 			+ "5. Inspect/edit the model definition: modeldoc_get / modeldoc_set / modeldoc_add_physics."),
 
+		["animate-a-model"] = ("Author an animation (Animation Editor)",
+			"Needs the Pointless AI Animation Editor library - check animeditor_status first (tools are disabled until it's installed).\n"
+			+ "1. animeditor_new_document modelPath='models/citizen/citizen.vmdl' (or animeditor_open_document for an existing one).\n"
+			+ "2. Pose per frame: animeditor_seek_frame -> animeditor_set_bone_pose -> animeditor_add_keyframe. Repeat across frames.\n"
+			+ "3. Refine: animeditor_set_curve (easing), animeditor_mirror_pose, animeditor_apply_library_pose, animeditor_add_event, animeditor_add_attachment.\n"
+			+ "4. animeditor_get_document_state any time to see tracks/keys/events as JSON; animeditor_validate to catch issues.\n"
+			+ "5. animeditor_export_and_compile -> playable .vmdl sequence (read the returned compile log).\n"
+			+ "6. See it: animeditor_capture_viewport (the editor's own viewport; editor_screenshot can't see it).\n"
+			+ "Bridges (only if those libraries are installed / capability enabled): animeditor_retarget_animation, animeditor_auto_rig_model, animeditor_generate_from_text."),
+
 		["animation"] = ("Animation and AnimGraph",
 			"1. Characters animate via SkinnedModelRenderer + an animgraph (.vanmgrph).\n"
 			+ "2. animgraph_list_parameters path='models/x.vanmgrph' - the knobs code can drive.\n"

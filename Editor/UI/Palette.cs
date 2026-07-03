@@ -40,6 +40,7 @@ public static class Palette
 		[ToolCategory.Code] = (Color)"#4ADE80",
 		[ToolCategory.Editor] = (Color)"#FACC15",
 		[ToolCategory.Retargeter] = (Color)"#FB7185",
+		[ToolCategory.AnimEditor] = (Color)"#C084FC",
 		[ToolCategory.Cloud] = (Color)"#38BDF8",
 		[ToolCategory.Imported] = (Color)"#94A3B8"
 	};

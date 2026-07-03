@@ -65,6 +65,7 @@ public static class McpHost
 		ToolRegistry.RequirementResolver = key => key switch
 		{
 			Tools.RetargeterTools.Requirement => Tools.RetargeterTools.IsInstalled ? null : "Not Installed",
+			Tools.AnimEditorTools.Requirement => Tools.AnimEditorTools.IsInstalled ? null : "Not Installed",
 			_ => null
 		};
 

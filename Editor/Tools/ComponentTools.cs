@@ -81,12 +81,12 @@ public static class ComponentTools
 		};
 	}
 
-	[McpTool( "component_set_property", "Sets one property on a component. Value is raw JSON (number, string, bool, array, or object). Resource properties accept asset paths as strings.", ToolCategory.Component, Writes = true )]
+	[McpTool( "component_set_property", "Sets one property on a component. Value is raw JSON. Resource properties accept an asset path string. Component/GameObject reference properties (e.g. a controller's Renderer/Target) accept a GameObject id, or 'goId:ComponentType' to pick a specific component.", ToolCategory.Component, Writes = true )]
 	public static object SetProperty(
 		[Desc( "GameObject id or unique name" )] string gameObject,
 		[Desc( "Component type name" )] string type,
 		[Desc( "Property name as shown by component_get_properties" )] string property,
-		[Desc( "New value as JSON" )] JsonElement value )
+		[Desc( "New value as JSON (or an id string for reference properties)" )] JsonElement value )
 	{
 		var session = RequireSession();
 		var go = FindGameObject( gameObject );
@@ -101,8 +101,24 @@ public static class ComponentTools
 				$"Component '{component.GetType().Name}' has no property '{property}'. Available: "
 				+ string.Join( ", ", node.Select( kv => kv.Key ).Where( k => !k.StartsWith( "__" ) ) ) );
 
+		// resolve the real CLR property so reference types can be set directly
+		var propInfo = component.GetType().GetProperty( key,
+			System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase );
+
 		using var undo = session.UndoScope( $"MCP: set {key}" )
 			.WithComponentChanges( new[] { component } ).Push();
+
+		// Component / GameObject reference properties don't round-trip through
+		// JSON reliably in the editor (ComponentReference.Resolve needs the
+		// active scene) - resolve the target ourselves and set it directly.
+		if ( propInfo is not null && propInfo.CanWrite
+			&& (typeof( Component ).IsAssignableFrom( propInfo.PropertyType ) || propInfo.PropertyType == typeof( GameObject )) )
+		{
+			var resolved = ResolveReference( value, propInfo.PropertyType );
+			propInfo.SetValue( component, resolved );
+
+			return new { set = key, on = component.GetType().Name, reference = resolved is null ? "cleared" : "linked", now = component.Serialize() };
+		}
 
 		// apply ONLY the target property: deserializing the full snapshot would
 		// re-apply every other property too, and a resource that is still
@@ -116,6 +132,53 @@ public static class ComponentTools
 		component.DeserializeImmediately( minimal );
 
 		return new { set = key, on = component.GetType().Name, now = component.Serialize() };
+	}
+
+	/// <summary>
+	/// Resolves a JSON value to a Component or GameObject. Accepts a plain id
+	/// string, "goId:ComponentType", or a serialized reference object
+	/// ({go, component_id, component_type}). Null/empty clears the reference.
+	/// </summary>
+	static object ResolveReference( JsonElement value, System.Type targetType )
+	{
+		string idOrSpec = null;
+
+		if ( value.ValueKind == JsonValueKind.Null )
+			return null;
+
+		if ( value.ValueKind == JsonValueKind.String )
+			idOrSpec = value.GetString();
+		else if ( value.ValueKind == JsonValueKind.Object )
+		{
+			// serialized-reference form
+			var compId = value.TryGetProperty( "component_id", out var c ) ? c.GetString() : null;
+			var goId = value.TryGetProperty( "go", out var g ) ? g.GetString() : null;
+			var compType = value.TryGetProperty( "component_type", out var t ) ? t.GetString() : null;
+
+			if ( targetType == typeof( GameObject ) )
+				idOrSpec = goId;
+			else if ( goId is not null )
+				idOrSpec = compType is not null ? $"{goId}:{compType}" : goId;
+			else if ( compId is not null )
+				idOrSpec = compId; // fall back to a component id
+		}
+
+		if ( string.IsNullOrWhiteSpace( idOrSpec ) )
+			return null;
+
+		if ( targetType == typeof( GameObject ) )
+			return FindGameObject( idOrSpec );
+
+		// component: "goId:ComponentType" or an id that identifies the owning object
+		var parts = idOrSpec.Split( ':', 2 );
+		var owner = FindGameObject( parts[0] );
+
+		if ( parts.Length == 2 )
+			return FindComponent( owner, parts[1] );
+
+		return owner.Components.GetAll<Component>( FindMode.EverythingInSelf ).FirstOrDefault( x => targetType.IsInstanceOfType( x ) )
+			?? throw new InvalidOperationException(
+				$"'{owner.Name}' has no {targetType.Name} component - pass 'goId:ComponentType' to name a specific one" );
 	}
 
 	[McpTool( "component_set_enabled", "Enables or disables a component.", ToolCategory.Component, Writes = true )]

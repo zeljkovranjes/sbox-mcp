@@ -38,6 +38,28 @@ public static class PhysicsTools
 		};
 	}
 
+	[McpTool( "gameobject_drop_to_ground", "Moves a GameObject straight down onto the first solid surface below it (like Blender's drop-to-floor).", ToolCategory.GameObject, Writes = true )]
+	public static object DropToGround(
+		[Desc( "GameObject id or unique name" )] string gameObject,
+		[Desc( "Start the downward trace this far above the object (to clear its own body)" )] float startOffset = 200f )
+	{
+		var session = RequireSession();
+		var go = FindGameObject( gameObject );
+
+		var start = go.WorldPosition + Vector3.Up * startOffset;
+		var result = session.Scene.Trace.Ray( start, start + Vector3.Down * 100000f )
+			.IgnoreGameObjectHierarchy( go )
+			.Run();
+
+		if ( !result.Hit )
+			return new { gameObject = go.Name, dropped = false, note = "nothing solid below - is there ground with a collider?" };
+
+		using var undo = session.UndoScope( "MCP: drop to ground" ).WithGameObjectChanges( go, GameObjectUndoFlags.Properties ).Push();
+		go.WorldPosition = result.EndPosition;
+
+		return new { gameObject = go.Name, dropped = true, position = V( go.WorldPosition ), groundObject = result.GameObject?.Name };
+	}
+
 	[McpTool( "scene_trace_down", "Finds the ground (or whatever solid surface) directly below a point by tracing downward. Handy for dropping objects onto the floor.", ToolCategory.Scene )]
 	public static object TraceDown(
 		[Desc( "Point to trace down from [x, y, z]" )] float[] from,

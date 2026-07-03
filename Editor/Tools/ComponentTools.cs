@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -108,16 +109,60 @@ public static class ComponentTools
 		using var undo = session.UndoScope( $"MCP: set {key}" )
 			.WithComponentChanges( new[] { component } ).Push();
 
+		ApplyProperty( component, node, key, propInfo, value );
+
+		return new { set = key, on = component.GetType().Name, now = component.Serialize() };
+	}
+
+	[McpTool( "component_set_properties", "Sets several properties on one component in a single call. Values follow the same rules as component_set_property (asset paths for resources, ids for references).", ToolCategory.Component, Writes = true )]
+	public static object SetProperties(
+		[Desc( "GameObject id or unique name" )] string gameObject,
+		[Desc( "Component type name" )] string type,
+		[Desc( "Object mapping property name -> value, e.g. {\"WalkSpeed\":200,\"ThirdPerson\":true}" )] JsonElement properties )
+	{
+		if ( properties.ValueKind != JsonValueKind.Object )
+			throw new ArgumentException( "properties must be a JSON object of name -> value" );
+
+		var session = RequireSession();
+		var go = FindGameObject( gameObject );
+		var component = FindComponent( go, type );
+
+		using var undo = session.UndoScope( $"MCP: set {type} properties" )
+			.WithComponentChanges( new[] { component } ).Push();
+
+		var applied = new List<string>();
+		foreach ( var kv in properties.EnumerateObject() )
+		{
+			if ( component.Serialize() is not JsonObject node )
+				throw new InvalidOperationException( $"Component '{type}' did not serialize to an object" );
+
+			var key = node.Select( n => n.Key )
+				.FirstOrDefault( k => string.Equals( k, kv.Name, StringComparison.OrdinalIgnoreCase ) );
+			if ( key is null )
+				throw new InvalidOperationException( $"Component '{component.GetType().Name}' has no property '{kv.Name}'" );
+
+			var propInfo = component.GetType().GetProperty( key,
+				System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase );
+
+			ApplyProperty( component, node, key, propInfo, kv.Value );
+			applied.Add( key );
+		}
+
+		return new { set = applied.ToArray(), on = component.GetType().Name, now = component.Serialize() };
+	}
+
+	/// <summary>Applies one value to a component property, resolving reference
+	/// types directly and everything else via a minimal deserialize.</summary>
+	static void ApplyProperty( Component component, JsonObject node, string key, System.Reflection.PropertyInfo propInfo, JsonElement value )
+	{
 		// Component / GameObject reference properties don't round-trip through
 		// JSON reliably in the editor (ComponentReference.Resolve needs the
 		// active scene) - resolve the target ourselves and set it directly.
 		if ( propInfo is not null && propInfo.CanWrite
 			&& (typeof( Component ).IsAssignableFrom( propInfo.PropertyType ) || propInfo.PropertyType == typeof( GameObject )) )
 		{
-			var resolved = ResolveReference( value, propInfo.PropertyType );
-			propInfo.SetValue( component, resolved );
-
-			return new { set = key, on = component.GetType().Name, reference = resolved is null ? "cleared" : "linked", now = component.Serialize() };
+			propInfo.SetValue( component, ResolveReference( value, propInfo.PropertyType ) );
+			return;
 		}
 
 		// apply ONLY the target property: deserializing the full snapshot would
@@ -128,10 +173,7 @@ public static class ComponentTools
 		if ( node["__guid"] is JsonNode guidNode ) minimal["__guid"] = guidNode.DeepClone();
 		minimal[key] = value.ValueKind == JsonValueKind.Null ? null : JsonNode.Parse( value.GetRawText() );
 
-		// Deserialize() only queues the data - DeserializeImmediately applies it now
 		component.DeserializeImmediately( minimal );
-
-		return new { set = key, on = component.GetType().Name, now = component.Serialize() };
 	}
 
 	/// <summary>

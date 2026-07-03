@@ -162,10 +162,11 @@ public static class GameObjectTools
 		return Describe( clone );
 	}
 
-	[McpTool( "gameobject_find", "Searches GameObjects by name substring and/or component type.", ToolCategory.GameObject )]
+	[McpTool( "gameobject_find", "Searches GameObjects by name substring, component type, and/or tag.", ToolCategory.GameObject )]
 	public static object Find(
 		[Desc( "Name substring (case-insensitive); omit to match all" )] string query = null,
 		[Desc( "Only objects having this component type" )] string componentType = null,
+		[Desc( "Only objects carrying this tag" )] string tag = null,
 		int max = 50 )
 	{
 		var scene = RequireScene();
@@ -173,6 +174,7 @@ public static class GameObjectTools
 		var results = scene.GetAllObjects( false )
 			.Where( o => o is not Scene )
 			.Where( o => query is null || o.Name.Contains( query, StringComparison.OrdinalIgnoreCase ) )
+			.Where( o => tag is null || o.Tags.Has( tag ) )
 			.Where( o => componentType is null || o.Components.GetAll<Component>( FindMode.EverythingInSelf )
 				.Any( c => string.Equals( c.GetType().Name, componentType, StringComparison.OrdinalIgnoreCase )
 					|| string.Equals( c.GetType().FullName, componentType, StringComparison.OrdinalIgnoreCase ) ) )

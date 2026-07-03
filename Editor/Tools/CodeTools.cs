@@ -120,6 +120,32 @@ public static class CodeTools
 		return new { written = path, note = "hot-reload triggers automatically; verify with code_get_compile_errors" };
 	}
 
+	[McpTool( "code_edit_file", "Replaces an exact text snippet in a project source file - a targeted edit, versus code_write_file which rewrites the whole file. The old text must appear EXACTLY ONCE (include surrounding context to make it unique). The editor hot-reloads afterward.", ToolCategory.Code, Writes = true )]
+	public static object EditFile(
+		[Desc( "Path relative to project root, e.g. 'Code/Player.cs'" )] string path,
+		[Desc( "Exact existing text to replace (must be unique in the file, whitespace included)" )] string oldText,
+		[Desc( "Replacement text" )] string newText )
+	{
+		if ( string.IsNullOrEmpty( oldText ) )
+			throw new ArgumentException( "oldText must not be empty - use code_write_file to create/overwrite a file" );
+
+		var absolute = ResolveInProject( path );
+		if ( !File.Exists( absolute ) )
+			throw new InvalidOperationException( $"No file at '{path}' - use code_list_files" );
+
+		var content = File.ReadAllText( absolute );
+
+		var first = content.IndexOf( oldText, StringComparison.Ordinal );
+		if ( first < 0 )
+			throw new InvalidOperationException( $"The old text was not found in '{path}' - read it with code_read_file and match exactly (whitespace included)" );
+		if ( content.IndexOf( oldText, first + 1, StringComparison.Ordinal ) >= 0 )
+			throw new InvalidOperationException( $"The old text appears more than once in '{path}' - include more surrounding context to make it unique" );
+
+		File.WriteAllText( absolute, content.Remove( first, oldText.Length ).Insert( first, newText ) );
+
+		return new { edited = path, note = "hot-reload triggers automatically; verify with code_get_compile_errors" };
+	}
+
 	[McpTool( "code_create_component", "Scaffolds a new Component C# file (a script you can add to GameObjects) with the standard boilerplate and any [Property] fields. The editor hot-reloads it, then add it with component_add.", ToolCategory.Code, Writes = true )]
 	public static object CreateComponent(
 		[Desc( "Component class name, e.g. 'PlayerMovement'" )] string className,

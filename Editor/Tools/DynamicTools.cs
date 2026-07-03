@@ -93,13 +93,24 @@ public static class DynamicTools
 
 	static Type ResolveType( string typeName )
 	{
+		// type library first (has friendly names for game/editor types)
 		var desc = EditorTypeLibrary.GetTypes()
 			.FirstOrDefault( t => t.TargetType is not null
 				&& (string.Equals( t.TargetType.FullName, typeName, StringComparison.OrdinalIgnoreCase )
 					|| string.Equals( t.Name, typeName, StringComparison.OrdinalIgnoreCase )) );
+		if ( desc?.TargetType is not null )
+			return desc.TargetType;
 
-		return desc?.TargetType
-			?? throw new InvalidOperationException( $"No type '{typeName}' - use api_search to find it" );
+		// fall back to raw assembly reflection so low-level engine types
+		// (RealTime, Time, ...) that api_search/api_dump surface are usable too
+		var fromAssemblies = AppDomain.CurrentDomain.GetAssemblies()
+			.Where( a => !a.IsDynamic )
+			.SelectMany( a => { try { return a.GetExportedTypes(); } catch { return Array.Empty<Type>(); } } )
+			.FirstOrDefault( t => string.Equals( t.FullName, typeName, StringComparison.OrdinalIgnoreCase )
+				|| string.Equals( t.Name, typeName, StringComparison.OrdinalIgnoreCase ) );
+
+		return fromAssemblies
+			?? throw new InvalidOperationException( $"No type '{typeName}' - use api_search to find it (try the full name like 'Sandbox.{typeName}')" );
 	}
 
 	static object InvokeBest( MethodInfo[] candidates, object instance, JsonElement args, string label )

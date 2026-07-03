@@ -349,6 +349,34 @@ public static class ComponentTools
 		return new { attached = item.Name, toBone = boneName, onCharacter = charGo.Name, snapped = !keepWorldPosition };
 	}
 
+	[McpTool( "physics_add_joint", "Connects two GameObjects with a physics joint - hinge (doors/levers), ball (ragdoll/chains), slider (pistons/elevators), fixed (weld together). Adds the joint to the first object and wires the second as the connected body. Both usually need a Rigidbody (or one static).", ToolCategory.Component, Writes = true )]
+	public static object AddJoint(
+		[Desc( "First GameObject - gets the joint component (usually has a Rigidbody)" )] string gameObject,
+		[Desc( "Second GameObject to connect to (the other/anchor body)" )] string connectedTo,
+		[Desc( "Joint type: 'hinge', 'ball', 'slider', or 'fixed'" )] string type = "fixed" )
+	{
+		var session = RequireSession();
+		var go = FindGameObject( gameObject );
+		var other = FindGameObject( connectedTo );
+
+		var jointType = (type ?? "fixed").ToLowerInvariant() switch
+		{
+			"hinge" => "HingeJoint",
+			"ball" => "BallJoint",
+			"slider" => "SliderJoint",
+			"fixed" or "weld" => "FixedJoint",
+			_ => throw new ArgumentException( "type must be 'hinge', 'ball', 'slider' or 'fixed'" )
+		};
+
+		using var undo = session.UndoScope( $"MCP: add {jointType}" ).WithComponentCreations().Push();
+
+		var joint = go.Components.Create( FindComponentType( jointType ) ) as Joint
+			?? throw new InvalidOperationException( $"Could not create a {jointType}" );
+		joint.Body = other;
+
+		return new { added = jointType, on = go.Name, connectedTo = other.Name };
+	}
+
 	[McpTool( "component_set_enabled", "Enables or disables a component.", ToolCategory.Component, Writes = true )]
 	public static object SetEnabled(
 		[Desc( "GameObject id or unique name" )] string gameObject,

@@ -212,6 +212,12 @@ public static class DynamicTools
 	/// GameObject/Component parameters from an id string.</summary>
 	static object Convert( JsonElement value, Type target, string paramName )
 	{
+		// by-ref params (Vector3&, common in s&box physics/math APIs) can't be
+		// deserialized directly - unwrap to the element type; reflection Invoke
+		// accepts the value positionally for a ref/in parameter
+		if ( target.IsByRef )
+			target = target.GetElementType();
+
 		var underlying = Nullable.GetUnderlyingType( target ) ?? target;
 
 		if ( typeof( GameObject ).IsAssignableFrom( underlying ) )

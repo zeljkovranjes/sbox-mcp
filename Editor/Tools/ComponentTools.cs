@@ -283,6 +283,36 @@ public static class ComponentTools
 		return new { on = component.GetType().Name, property = match.Key, value = match.Value };
 	}
 
+	[McpTool( "model_get_bone", "Gets a bone of a SkinnedModelRenderer as a GameObject you can parent things to (e.g. attach a weapon to 'hand_R') plus its live world transform.", ToolCategory.Component )]
+	public static object GetBone(
+		[Desc( "GameObject id or unique name (must have a SkinnedModelRenderer)" )] string gameObject,
+		[Desc( "Bone name, e.g. 'hand_R', 'head', 'spine_2'" )] string boneName )
+	{
+		var go = FindGameObject( gameObject );
+		var renderer = go.Components.Get<SkinnedModelRenderer>()
+			?? throw new InvalidOperationException( $"'{go.Name}' has no SkinnedModelRenderer" );
+
+		var boneGo = renderer.GetBoneObject( boneName )
+			?? throw new InvalidOperationException( $"No bone '{boneName}' on this model - bone names vary; common ones are 'head', 'hand_R', 'hand_L', 'pelvis'" );
+
+		return new { bone = boneName, gameObjectId = boneGo.Id, worldPosition = V( boneGo.WorldPosition ), worldRotation = A( boneGo.WorldRotation ) };
+	}
+
+	[McpTool( "model_get_attachment", "Gets a model attachment point's world transform (attachments are named points authored on the model, e.g. 'hand', 'eyes', 'muzzle').", ToolCategory.Component )]
+	public static object GetAttachment(
+		[Desc( "GameObject id or unique name (must have a SkinnedModelRenderer)" )] string gameObject,
+		[Desc( "Attachment name" )] string attachmentName )
+	{
+		var go = FindGameObject( gameObject );
+		var renderer = go.Components.Get<SkinnedModelRenderer>()
+			?? throw new InvalidOperationException( $"'{go.Name}' has no SkinnedModelRenderer" );
+
+		var attachment = renderer.GetAttachment( attachmentName, true )
+			?? throw new InvalidOperationException( $"No attachment '{attachmentName}' on this model - use modeldoc_get to see its attachments" );
+
+		return new { attachment = attachmentName, worldPosition = V( attachment.Position ), worldRotation = A( attachment.Rotation ) };
+	}
+
 	[McpTool( "component_set_enabled", "Enables or disables a component.", ToolCategory.Component, Writes = true )]
 	public static object SetEnabled(
 		[Desc( "GameObject id or unique name" )] string gameObject,

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Sandbox;
 using SboxMcp.Registry;
 using static SboxMcp.Tools.ToolHelpers;
@@ -55,6 +57,28 @@ public static class PhysicsTools
 			normal = V( result.Normal ),
 			distance = result.Distance
 		};
+	}
+
+	[McpTool( "scene_overlap_sphere", "Finds every object whose collider overlaps a sphere at a point - a proximity / area-of-effect query (explosion damage, AI perception, 'what is near here'). Returns the GameObjects found, nearest first.", ToolCategory.Scene )]
+	public static object OverlapSphere(
+		[Desc( "Sphere center [x, y, z]" )] float[] center,
+		[Desc( "Sphere radius" )] float radius )
+	{
+		if ( radius <= 0 )
+			throw new ArgumentException( "radius must be positive" );
+
+		var scene = RequireScene();
+		var c = ToVector3( center, "center" );
+		var results = scene.Trace.Sphere( radius, c, c ).RunAll();
+
+		var seen = new HashSet<Guid>();
+		var objects = results
+			.Where( r => r.GameObject is not null && seen.Add( r.GameObject.Id ) )
+			.Select( r => new { id = r.GameObject.Id, name = r.GameObject.Name, distance = Vector3.DistanceBetween( c, r.GameObject.WorldPosition ) } )
+			.OrderBy( o => o.distance )
+			.ToArray();
+
+		return new { center = V( c ), radius, count = objects.Length, objects };
 	}
 
 	[McpTool( "gameobject_drop_to_ground", "Moves a GameObject straight down onto the first solid surface below it (like Blender's drop-to-floor).", ToolCategory.GameObject, Writes = true )]

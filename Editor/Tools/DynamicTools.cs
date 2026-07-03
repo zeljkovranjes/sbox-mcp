@@ -165,27 +165,36 @@ public static class DynamicTools
 
 		// try every count-compatible overload, binding args; use the first that
 		// binds cleanly (so Play(string) is tried even if Play(SoundEvent) came first)
+		// the caller only supplies non-`out` params; `out` params (TryGet(...) etc.)
+		// are filled by the method and returned in `outputs`
+		static int CallerParamCount( MethodInfo m ) => m.GetParameters().Count( p => !p.IsOut );
+
 		var compatible = candidates
-			.Where( m => m.GetParameters().Count( p => !p.IsOptional ) <= argCount && m.GetParameters().Length >= argCount )
+			.Where( m => m.GetParameters().Count( p => !p.IsOptional && !p.IsOut ) <= argCount && CallerParamCount( m ) >= argCount )
 			.ToArray();
 
 		if ( compatible.Length == 0 )
 			throw new InvalidOperationException(
 				$"'{label}' has no overload taking {argCount} argument(s). Overloads: "
-				+ string.Join( " | ", candidates.Select( m => $"({string.Join( ", ", m.GetParameters().Select( p => p.ParameterType.Name ) )})" ) ) );
+				+ string.Join( " | ", candidates.Select( m => $"({string.Join( ", ", m.GetParameters().Select( p => (p.IsOut ? "out " : "") + p.ParameterType.Name ) )})" ) ) );
 
 		ArgumentException lastBindError = null;
 		foreach ( var method in compatible )
 		{
 			var parameters = method.GetParameters();
 			var bound = new object[parameters.Length];
+			var callerArg = 0;
 			try
 			{
 				for ( var i = 0; i < parameters.Length; i++ )
 				{
-					bound[i] = i < argCount
-						? Convert( args[i], parameters[i].ParameterType, parameters[i].Name )
-						: parameters[i].HasDefaultValue ? parameters[i].DefaultValue : Default( parameters[i].ParameterType );
+					var pi = parameters[i];
+					if ( pi.IsOut )
+						bound[i] = Default( pi.ParameterType.GetElementType() ?? pi.ParameterType ); // filled by the method
+					else if ( callerArg < argCount )
+						bound[i] = Convert( args[callerArg++], pi.ParameterType, pi.Name );
+					else
+						bound[i] = pi.HasDefaultValue ? pi.DefaultValue : Default( pi.ParameterType );
 				}
 			}
 			catch ( ArgumentException e )
@@ -197,7 +206,17 @@ public static class DynamicTools
 			try
 			{
 				var result = method.Invoke( instance, bound );
-				return new { invoked = label, returned = method.ReturnType == typeof( void ) ? "void" : Present( result ) };
+
+				var outputs = parameters
+					.Where( p => p.IsOut )
+					.ToDictionary( p => p.Name, p => Present( bound[p.Position] ) );
+
+				return new
+				{
+					invoked = label,
+					returned = method.ReturnType == typeof( void ) ? "void" : Present( result ),
+					outputs = outputs.Count > 0 ? outputs : null
+				};
 			}
 			catch ( TargetInvocationException e ) when ( e.InnerException is not null )
 			{

@@ -76,7 +76,13 @@ public static class PhysicsTools
 		var seen = new HashSet<Guid>();
 		var objects = results
 			.Where( r => r.GameObject is not null && seen.Add( r.GameObject.Id ) )
-			.Select( r => new { id = r.GameObject.Id, name = r.GameObject.Name, distance = Vector3.DistanceBetween( c, r.GameObject.WorldPosition ) } )
+			.Select( r => new
+			{
+				id = r.GameObject.Id,
+				name = r.GameObject.Name,
+				distance = Vector3.DistanceBetween( c, r.GameObject.WorldPosition ),
+				tags = r.GameObject.Tags.TryGetAll().ToArray()
+			} )
 			.OrderBy( o => o.distance )
 			.ToArray();
 

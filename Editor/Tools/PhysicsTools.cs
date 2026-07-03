@@ -36,7 +36,8 @@ public static class PhysicsTools
 			hitComponent = result.Component?.GetType().Name,
 			point = V( result.EndPosition ),
 			normal = V( result.Normal ),
-			distance = result.Distance
+			distance = result.Distance,
+			tags = result.GameObject?.Tags.TryGetAll().ToArray()
 		};
 	}
 
@@ -55,7 +56,8 @@ public static class PhysicsTools
 			hitObject = result.GameObject is null ? null : new { id = result.GameObject.Id, name = result.GameObject.Name },
 			point = V( result.EndPosition ),
 			normal = V( result.Normal ),
-			distance = result.Distance
+			distance = result.Distance,
+			tags = result.GameObject?.Tags.TryGetAll().ToArray()
 		};
 	}
 
@@ -120,7 +122,8 @@ public static class PhysicsTools
 			groundObject = result.GameObject is null ? null : new { id = result.GameObject.Id, name = result.GameObject.Name },
 			groundPoint = result.Hit ? V( result.EndPosition ) : null,
 			groundHeight = result.Hit ? result.EndPosition.z : (float?)null,
-			normal = V( result.Normal )
+			normal = V( result.Normal ),
+			tags = result.GameObject?.Tags.TryGetAll().ToArray()
 		};
 	}
 }

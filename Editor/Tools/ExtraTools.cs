@@ -104,20 +104,27 @@ public static class ExtraTools
 		return new { count, created };
 	}
 
-	[McpTool( "component_copy", "Copies all property values from one component to another component of the same type (e.g. clone a configured renderer's settings).", ToolCategory.Component, Writes = true )]
+	[McpTool( "component_copy", "Copies all property values from one component to another GameObject's component of the same type (e.g. clone a configured renderer's settings). Creates the component on the target if it doesn't have one yet.", ToolCategory.Component, Writes = true )]
 	public static object CopyComponent(
 		[Desc( "Source GameObject id or unique name" )] string fromGameObject,
 		[Desc( "Target GameObject id or unique name" )] string toGameObject,
-		[Desc( "Component type name (must exist on both)" )] string type )
+		[Desc( "Component type name" )] string type )
 	{
 		var session = RequireSession();
 		var source = FindComponent( FindGameObject( fromGameObject ), type );
-		var target = FindComponent( FindGameObject( toGameObject ), type );
+		var toGo = FindGameObject( toGameObject );
 
-		if ( source.GetType() != target.GetType() )
-			throw new InvalidOperationException( "Source and target components are different types" );
+		var existing = toGo.Components.GetAll<Component>( FindMode.EverythingInSelf )
+			.FirstOrDefault( c => c.GetType() == source.GetType() );
 
-		using var undo = session.UndoScope( $"MCP: copy {type}" ).WithComponentChanges( new[] { target } ).Push();
+		using var undo = session.UndoScope( $"MCP: copy {type}" )
+			.WithComponentCreations()
+			.WithComponentChanges( existing is not null ? new[] { existing } : Array.Empty<Component>() )
+			.Push();
+
+		// create a matching component on the target if it has none yet
+		var target = existing ?? toGo.Components.Create( FindComponentType( type ) )
+			?? throw new InvalidOperationException( $"Could not create a {type} on '{toGameObject}'" );
 
 		if ( source.Serialize() is System.Text.Json.Nodes.JsonObject node )
 		{
@@ -126,6 +133,6 @@ public static class ExtraTools
 			target.DeserializeImmediately( node );
 		}
 
-		return new { copied = type, from = fromGameObject, to = toGameObject };
+		return new { copied = type, from = fromGameObject, to = toGameObject, createdTarget = existing is null };
 	}
 }

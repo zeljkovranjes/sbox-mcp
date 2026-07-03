@@ -50,6 +50,21 @@ claude mcp add --transport http sbox http://127.0.0.1:9090/sbox-mcp
 
 Every scene mutation runs inside an editor undo scope — anything the AI does, you can Ctrl+Z.
 
+## What can it edit?
+
+Effectively **everything an AI could reasonably drive in the editor.** Beyond the
+named tools below, four universal mechanisms give total reach:
+
+- **Any component property** — `component_set_property` sets any `[Property]` on any component (built-in or custom).
+- **Any text asset** — `asset_write_raw` writes any resource; every s&box format is KV3 or JSON.
+- **Any C#** — `code_write_file` writes components, systems, editor tools, UI; the editor hot-reloads.
+- **Any type** — `api_search` / `api_get_type` reflect the whole API so the AI discovers what exists.
+
+So "add a player" isn't a special tool — the AI finds `PlayerController` with
+`api_search`, reads its fields with `api_get_type`, and composes it. See
+[CAPABILITIES.md](CAPABILITIES.md) for the full subsystem-by-subsystem map and
+the (few) honest limits.
+
 ## Tool families
 
 | Prefix | What it covers |
@@ -65,8 +80,9 @@ Every scene mutation runs inside an editor undo scope — anything the AI does, 
 | `animgraph_` | Read as JSON, write KV3, list parameters |
 | `shadergraph_` / `actiongraph_` | Read/write the JSON formats, list nodes |
 | `input_` / `project_` | List/add/remove input actions, set the startup scene |
-| `code_` | List/read/write C#, Razor, SCSS and shader files (hot-reload is automatic), compile errors, invoke a static method to test |
-| `editor_` | Console logs, screenshots, play/stop, console commands, project info, selection |
+| `code_` | List/read/write C#, Razor, SCSS and shader files (hot-reload is automatic), scaffold a component, compile errors, invoke a static method to test |
+| `api_` | Search the whole s&box + project type surface, read any type's real members |
+| `editor_` | Console logs, screenshots (incl. from any angle), play/stop, console commands, project info, selection, frame object |
 | `retargeter_` | Drives the Humanoid Retargeter library when installed (shown disabled otherwise) |
 | `lib_` | Tools you imported from other libraries via Import Tools |
 

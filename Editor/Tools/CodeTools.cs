@@ -52,6 +52,7 @@ public static class CodeTools
 		[Desc( "Treat pattern as a regular expression" )] bool regex = false,
 		[Desc( "Case-sensitive match" )] bool caseSensitive = false,
 		[Desc( "Limit to a subdirectory relative to project root" )] string subdir = null,
+		[Desc( "Also search installed library source under Libraries/" )] bool includeLibraries = false,
 		int max = 100 )
 	{
 		if ( string.IsNullOrEmpty( pattern ) )
@@ -75,6 +76,8 @@ public static class CodeTools
 			if ( !SourceExtensions.Contains( Path.GetExtension( file ), StringComparer.OrdinalIgnoreCase ) )
 				continue;
 			if ( IsSkipped( file ) )
+				continue;
+			if ( !includeLibraries && file.Contains( Path.DirectorySeparatorChar + "Libraries" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase ) )
 				continue;
 
 			var rel = Path.GetRelativePath( root, file ).Replace( '\\', '/' );

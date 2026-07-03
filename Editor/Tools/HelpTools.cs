@@ -109,6 +109,6 @@ public static class HelpTools
 		if ( !Topics.TryGetValue( topic, out var entry ) )
 			throw new ArgumentException( $"No topic '{topic}'. Topics: {string.Join( ", ", Topics.Keys )}" );
 
-		return new { topic, entry.Title, steps = entry.Recipe };
+		return new { topic, title = entry.Title, steps = entry.Recipe };
 	}
 }

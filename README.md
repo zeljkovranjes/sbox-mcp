@@ -2,7 +2,7 @@
 
 # s&box MCP
 
-**An MCP server that runs inside the s&box editor.** Connect Claude Code, Claude Desktop, Cursor or VS Code and let AI build games in the editor — scenes, GameObjects, components, prefabs, assets, materials, sounds, input actions, cloud content, ModelDoc, AnimGraph, ShaderGraph, ActionGraph, code files (C#/Razor/SCSS), console diagnostics, play mode and screenshots. 70+ tools, an in-editor dashboard, and a setup that is exactly two steps.
+**An MCP server that runs inside the s&box editor.** Connect Claude Code, Claude Desktop, Cursor or VS Code and let AI build games in the editor — scenes, GameObjects, components, prefabs, assets, materials, sounds, input actions, cloud content, ModelDoc, AnimGraph, ShaderGraph, ActionGraph, code files (C#/Razor/SCSS), console diagnostics, play mode and screenshots. 80 tools including live API discovery and built-in workflow recipes (`help`), an in-editor dashboard, and a setup that is exactly two steps.
 
 ## Setup
 
@@ -82,6 +82,7 @@ the (few) honest limits.
 | `input_` / `project_` | List/add/remove input actions, set the startup scene |
 | `code_` | List/read/write C#, Razor, SCSS and shader files (hot-reload is automatic), scaffold a component, compile errors, invoke a static method to test |
 | `api_` | Search the whole s&box + project type surface, read any type's real members |
+| `help` | Step-by-step recipes for composing tools (make a player, materials, testing...) |
 | `editor_` | Console logs, screenshots (incl. from any angle), play/stop, console commands, project info, selection, frame object |
 | `retargeter_` | Drives the Humanoid Retargeter library when installed (shown disabled otherwise) |
 | `lib_` | Tools you imported from other libraries via Import Tools |

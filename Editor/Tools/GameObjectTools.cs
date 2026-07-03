@@ -45,6 +45,35 @@ public static class GameObjectTools
 		return Describe( go );
 	}
 
+	[McpTool( "gameobject_spawn_model", "Spawns a prop in one step: creates a GameObject, adds a ModelRenderer with the given model, and optionally a matching ModelCollider so physics/traces hit it. The common 'place a model' operation (vs gameobject_create + component_add + component_set_property).", ToolCategory.GameObject, Writes = true )]
+	public static object SpawnModel(
+		[Desc( "Model asset path, e.g. 'models/dev/box.vmdl'" )] string model,
+		[Desc( "Object name; defaults to the model's file name" )] string name = null,
+		[Desc( "World position [x, y, z]" )] float[] position = null,
+		[Desc( "Also add a ModelCollider so the prop is solid" )] bool withCollider = false )
+	{
+		if ( AssetSystem.FindByPath( model ) is null )
+			throw new InvalidOperationException( $"No model at '{model}' - use asset_search with assetType 'model'" );
+
+		var session = RequireSession();
+
+		using var undo = session.UndoScope( "MCP: spawn model" ).WithGameObjectCreations().Push();
+
+		var go = session.Scene.CreateObject();
+		go.Name = string.IsNullOrWhiteSpace( name ) ? System.IO.Path.GetFileNameWithoutExtension( model ) : name;
+
+		if ( position is not null )
+			go.WorldPosition = ToVector3( position, "position" );
+
+		var loaded = Model.Load( model );
+		go.Components.Create<ModelRenderer>().Model = loaded;
+
+		if ( withCollider )
+			go.Components.Create<ModelCollider>().Model = loaded;
+
+		return Describe( go );
+	}
+
 	[McpTool( "gameobject_delete", "Deletes a GameObject (and its children).", ToolCategory.GameObject, Writes = true )]
 	public static object Delete( [Desc( "GameObject id or unique name" )] string gameObject )
 	{

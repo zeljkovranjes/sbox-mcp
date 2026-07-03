@@ -1,8 +1,8 @@
 {
   "Title": "s&box MCP",
   "Type": "library",
-  "Org": "local",
-  "Ident": "mcp",
+  "Org": "notpointless",
+  "Ident": "chomnr_mcp",
   "Schema": 1,
   "HasAssets": false,
   "HasCode": false,

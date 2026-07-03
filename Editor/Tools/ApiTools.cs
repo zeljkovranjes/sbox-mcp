@@ -59,10 +59,15 @@ public static class ApiTools
 			?? throw new InvalidOperationException( $"No type '{typeName}' - use api_search to find it" );
 
 		var type = desc.TargetType;
-		const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+		// properties INCLUDE inherited ones - component_set_property accepts
+		// inherited members like Enabled/WorldPosition, so listing only declared
+		// members would mislead. Methods stay declared-only to avoid Object noise.
+		const BindingFlags propFlags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static;
+		const BindingFlags flags = propFlags | BindingFlags.DeclaredOnly;
 
-		var properties = type.GetProperties( flags )
+		var properties = type.GetProperties( propFlags )
 			.Where( p => p.GetIndexParameters().Length == 0 )
+			.GroupBy( p => p.Name ).Select( g => g.First() ) // dedupe overridden/shadowed
 			.Select( p => new
 			{
 				name = p.Name,
@@ -155,22 +160,19 @@ public static class ApiTools
 	/// <summary>(stable key, human display) for the running editor build.</summary>
 	static (string Key, string Display) EngineBuild()
 	{
-		// the engine assembly version changes every build - the reliable signal
-		var asmVersion = typeof( Sandbox.Component ).Assembly.GetName().Version?.ToString() ?? "unknown";
+		// Application.Version / VersionDate are the real per-build identity;
+		// the engine assembly version is static (1.0.1.0) so it can't be the key
+		var version = Sandbox.Application.Version;
+		DateTime date;
+		try { date = Sandbox.Application.VersionDate; }
+		catch { date = default; }
 
-		string buildDate = null;
-		try
-		{
-			// Sandbox.Standalone.BuildDate when present; reflected so a missing/
-			// internal member can never break the tool
-			var standalone = typeof( Sandbox.Component ).Assembly.GetType( "Sandbox.Standalone" );
-			if ( standalone?.GetProperty( "BuildDate", BindingFlags.Public | BindingFlags.Static )?.GetValue( null ) is DateTime dt && dt.Year > 2000 )
-				buildDate = dt.ToString( "yyyy-MM-dd" );
-		}
-		catch { /* ignore */ }
+		if ( string.IsNullOrWhiteSpace( version ) )
+			version = typeof( Sandbox.Component ).Assembly.GetName().Version?.ToString() ?? "unknown";
 
-		var key = buildDate is null ? asmVersion : $"{asmVersion}+{buildDate}";
-		var display = buildDate is null ? asmVersion : $"{asmVersion} (built {buildDate})";
+		var hasDate = date.Year > 2000;
+		var key = hasDate ? $"{version}+{date:yyyyMMddHHmmss}" : version;
+		var display = hasDate ? $"{version} ({date:yyyy-MM-dd HH:mm})" : version;
 		return (key, display);
 	}
 

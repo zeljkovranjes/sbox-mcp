@@ -109,33 +109,49 @@ public static class DynamicTools
 
 		var argCount = args.ValueKind == JsonValueKind.Array ? args.GetArrayLength() : 0;
 
-		var method = candidates.FirstOrDefault( m => m.GetParameters().Count( p => !p.IsOptional ) <= argCount && m.GetParameters().Length >= argCount )
-			?? candidates.FirstOrDefault( m => m.GetParameters().Length == argCount )
-			?? throw new InvalidOperationException(
+		// try every count-compatible overload, binding args; use the first that
+		// binds cleanly (so Play(string) is tried even if Play(SoundEvent) came first)
+		var compatible = candidates
+			.Where( m => m.GetParameters().Count( p => !p.IsOptional ) <= argCount && m.GetParameters().Length >= argCount )
+			.ToArray();
+
+		if ( compatible.Length == 0 )
+			throw new InvalidOperationException(
 				$"'{label}' has no overload taking {argCount} argument(s). Overloads: "
 				+ string.Join( " | ", candidates.Select( m => $"({string.Join( ", ", m.GetParameters().Select( p => p.ParameterType.Name ) )})" ) ) );
 
-		var parameters = method.GetParameters();
-		var bound = new object[parameters.Length];
-		for ( var i = 0; i < parameters.Length; i++ )
+		ArgumentException lastBindError = null;
+		foreach ( var method in compatible )
 		{
-			if ( i < argCount )
-				bound[i] = Convert( args[i], parameters[i].ParameterType, parameters[i].Name );
-			else
-				bound[i] = parameters[i].HasDefaultValue ? parameters[i].DefaultValue : Default( parameters[i].ParameterType );
+			var parameters = method.GetParameters();
+			var bound = new object[parameters.Length];
+			try
+			{
+				for ( var i = 0; i < parameters.Length; i++ )
+				{
+					bound[i] = i < argCount
+						? Convert( args[i], parameters[i].ParameterType, parameters[i].Name )
+						: parameters[i].HasDefaultValue ? parameters[i].DefaultValue : Default( parameters[i].ParameterType );
+				}
+			}
+			catch ( ArgumentException e )
+			{
+				lastBindError = e;
+				continue; // this overload's args don't fit - try the next
+			}
+
+			try
+			{
+				var result = method.Invoke( instance, bound );
+				return new { invoked = label, returned = method.ReturnType == typeof( void ) ? "void" : Present( result ) };
+			}
+			catch ( TargetInvocationException e ) when ( e.InnerException is not null )
+			{
+				throw e.InnerException;
+			}
 		}
 
-		object result;
-		try
-		{
-			result = method.Invoke( instance, bound );
-		}
-		catch ( TargetInvocationException e ) when ( e.InnerException is not null )
-		{
-			throw e.InnerException;
-		}
-
-		return new { invoked = label, returned = method.ReturnType == typeof( void ) ? "void" : Present( result ) };
+		throw lastBindError ?? new ArgumentException( $"Arguments did not match any overload of '{label}' - use api_get_type to check signatures" );
 	}
 
 	/// <summary>Converts a JSON value to the target CLR type, resolving
@@ -149,12 +165,20 @@ public static class DynamicTools
 
 		if ( typeof( Component ).IsAssignableFrom( underlying ) )
 		{
-			// "goId:ComponentType"
+			// "goId:ComponentType" - or just an id to take the first matching component
 			var parts = (value.GetString() ?? "").Split( ':', 2 );
 			var go = FindGameObject( parts[0] );
 			return parts.Length == 2 ? FindComponent( go, parts[1] )
 				: go.Components.GetAll<Component>( FindMode.EverythingInSelf ).FirstOrDefault( c => underlying.IsInstanceOfType( c ) )
-				?? throw new InvalidOperationException( $"'{go.Name}' has no {underlying.Name} component" );
+				?? throw new InvalidOperationException( $"'{go.Name}' has no {underlying.Name} component - pass 'goId:ComponentType'" );
+		}
+
+		// resources (Model/Material/SoundEvent/...) accept an asset path string,
+		// but only the engine's Json options resolve paths - not plain System.Text.Json
+		if ( typeof( Resource ).IsAssignableFrom( underlying ) && value.ValueKind == JsonValueKind.String )
+		{
+			try { return Json.Deserialize( JsonSerializer.Serialize( value.GetString() ), underlying ); }
+			catch ( Exception e ) { throw new ArgumentException( $"Argument '{paramName}' could not be resolved to a {underlying.Name}: {e.Message}" ); }
 		}
 
 		try
@@ -163,7 +187,7 @@ public static class DynamicTools
 		}
 		catch ( Exception e ) when ( e is JsonException or NotSupportedException )
 		{
-			throw new ArgumentException( $"Argument '{paramName}' could not be read as {underlying.Name}: {e.Message}" );
+			throw new ArgumentException( $"Argument '{paramName}' could not be read as {underlying.Name}: {e.Message}. Note: a Rotation array is a quaternion [x,y,z,w]; for euler use gameobject_set_transform." );
 		}
 	}
 

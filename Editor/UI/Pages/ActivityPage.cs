@@ -140,6 +140,12 @@ public class ActivityPage : Widget
 		if ( session is null || entry is null )
 			return;
 
+		if ( session.IsPlaying )
+		{
+			McpHost.Log.Info( "Can't revert while playing - stop play mode first" );
+			return;
+		}
+
 		var back = session.UndoSystem.Back;
 		if ( !back.Contains( entry ) )
 		{
@@ -147,7 +153,18 @@ public class ActivityPage : Widget
 			return;
 		}
 
-		entry.Undo?.Invoke();
+		try
+		{
+			entry.Undo?.Invoke();
+		}
+		catch ( Exception e )
+		{
+			McpHost.Log.Warning( $"Revert of '{entry.Name}' failed: {e.Message}" );
+			return;
+		}
+
+		// mirror what the engine's own Undo() does, so the scene knows it changed
+		session.HasUnsavedChanges = true;
 
 		// Stack<T> has no Remove - rebuild it without the reverted entry
 		var remaining = back.Where( e => !ReferenceEquals( e, entry ) ).ToList();

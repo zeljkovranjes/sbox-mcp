@@ -58,14 +58,17 @@ public static class ServerTools
 				if ( result is System.Threading.Tasks.Task )
 				{
 					results.Add( new { step = index, name, ok = false, error = "this tool is async and cannot run inside a batch - call it on its own" } );
+					LogStep( tool, args, true, "async tool skipped" );
 					if ( !continueOnError ) break; else continue;
 				}
 
 				results.Add( new { step = index, name, ok = true, result } );
+				LogStep( tool, args, false, null );
 			}
 			catch ( Exception e )
 			{
 				results.Add( new { step = index, name, ok = false, error = e.Message } );
+				LogStep( tool, args, false, e.Message );
 				if ( !continueOnError ) break;
 			}
 		}
@@ -73,6 +76,19 @@ public static class ServerTools
 		var ran = results.Count;
 		var failed = results.Count( r => r.GetType().GetProperty( "ok" )?.GetValue( r ) is false );
 		return new { requested = steps.GetArrayLength(), ran, failed, results };
+	}
+
+	// each batch step gets its own activity-feed entry (so revert/audit work per-step)
+	static void LogStep( RegisteredTool tool, JsonElement? args, bool skipped, string error )
+	{
+		ActivityLog.Record( new ActivityRecord
+		{
+			ToolName = $"batch:{tool.Meta.Name}",
+			Category = tool.Meta.Category,
+			ArgsDigest = PermissionGate.Summarize( args ),
+			Ok = error is null && !skipped,
+			Error = error
+		} );
 	}
 
 	[McpTool( "server_get_config", "Reads the MCP server's current configuration: port, permission mode, autostart, tool counts.", ToolCategory.Editor )]

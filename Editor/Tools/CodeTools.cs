@@ -112,10 +112,13 @@ public static class CodeTools
 		{
 			var sbproj = Directory.GetFiles( ProjectRoot, "*.sbproj" ).FirstOrDefault();
 			if ( sbproj is not null
-				&& System.Text.Json.Nodes.JsonNode.Parse( File.ReadAllText( sbproj ) ) is System.Text.Json.Nodes.JsonObject json
-				&& json["RootNamespace"]?.GetValue<string>() is string ns && !string.IsNullOrWhiteSpace( ns ) )
+				&& System.Text.Json.Nodes.JsonNode.Parse( File.ReadAllText( sbproj ) ) is System.Text.Json.Nodes.JsonObject json )
 			{
-				return ns;
+				// RootNamespace lives at Metadata.Compiler.RootNamespace; fall back to root
+				var ns = json["Metadata"]?["Compiler"]?["RootNamespace"]?.GetValue<string>()
+					?? json["RootNamespace"]?.GetValue<string>();
+				if ( !string.IsNullOrWhiteSpace( ns ) )
+					return ns;
 			}
 		}
 		catch { /* fall through to default */ }

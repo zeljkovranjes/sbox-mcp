@@ -76,6 +76,9 @@ public static class SceneTools
 	{
 		var session = RequireSession();
 
+		if ( session.IsPlaying )
+			throw new InvalidOperationException( "Cannot save while playing - editor_stop first (play-mode changes are discarded by design)" );
+
 		if ( session.Scene.Source is null )
 			throw new InvalidOperationException( "This scene has never been saved - use scene_save_as with a path" );
 
@@ -88,6 +91,12 @@ public static class SceneTools
 	{
 		var session = RequireSession();
 		var scene = session.Scene;
+
+		if ( session.IsPlaying )
+			throw new InvalidOperationException( "Cannot save while playing - editor_stop first (play-mode changes are discarded by design)" );
+
+		if ( scene is PrefabScene )
+			throw new InvalidOperationException( "The active session is a prefab - prefabs save with scene_save, or use prefab_create_from_gameobject" );
 
 		if ( !scenePath.EndsWith( ".scene", StringComparison.OrdinalIgnoreCase ) )
 			throw new ArgumentException( "scenePath must end in .scene" );

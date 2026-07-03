@@ -18,6 +18,8 @@ obj/
 .sbox/
 .vs/
 *.sln
+*.slnx
+Editor/*.csproj
 *.csproj.bak
 ProjectSettings/
 Exports/

@@ -108,4 +108,44 @@ public static class QueryTools
 		RequireSession().Selection.Clear();
 		return new { cleared = true };
 	}
+
+	[McpTool( "gameobject_distance", "Measures the distance between two GameObjects.", ToolCategory.GameObject )]
+	public static object Distance(
+		[Desc( "First GameObject id or unique name" )] string a,
+		[Desc( "Second GameObject id or unique name" )] string b )
+	{
+		var ga = FindGameObject( a );
+		var gb = FindGameObject( b );
+		var d = Vector3.DistanceBetween( ga.WorldPosition, gb.WorldPosition );
+		return new { from = ga.Name, to = gb.Name, distance = d, delta = V( gb.WorldPosition - ga.WorldPosition ) };
+	}
+
+	[McpTool( "gameobject_align", "Aligns GameObjects to a target position on the chosen axes (e.g. line them up on X). Unset axes keep each object's own value.", ToolCategory.GameObject, Writes = true )]
+	public static object Align(
+		[Desc( "GameObject ids or unique names to move" )] string[] gameObjects,
+		[Desc( "Target position [x, y, z]" )] float[] target,
+		[Desc( "Apply the target's X" )] bool x = false,
+		[Desc( "Apply the target's Y" )] bool y = false,
+		[Desc( "Apply the target's Z" )] bool z = false )
+	{
+		if ( gameObjects is null || gameObjects.Length == 0 )
+			throw new ArgumentException( "Pass at least one GameObject" );
+		if ( !x && !y && !z )
+			throw new ArgumentException( "Set at least one of x/y/z to align on" );
+
+		var session = RequireSession();
+		var t = ToVector3( target, "target" );
+		var objs = gameObjects.Select( FindGameObject ).ToList();
+
+		using var undo = session.UndoScope( "MCP: align" )
+			.WithGameObjectChanges( objs, GameObjectUndoFlags.Properties ).Push();
+
+		foreach ( var go in objs )
+		{
+			var p = go.WorldPosition;
+			go.WorldPosition = new Vector3( x ? t.x : p.x, y ? t.y : p.y, z ? t.z : p.z );
+		}
+
+		return new { aligned = objs.Select( o => o.Name ).ToArray(), axes = $"{(x?"x":"")}{(y?"y":"")}{(z?"z":"")}" };
+	}
 }

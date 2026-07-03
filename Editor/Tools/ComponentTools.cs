@@ -263,6 +263,26 @@ public static class ComponentTools
 				$"'{owner.Name}' has no {targetType.Name} component - pass 'goId:ComponentType' to name a specific one" );
 	}
 
+	[McpTool( "component_get_property", "Reads a single property value from a component (cheaper than dumping all of them).", ToolCategory.Component )]
+	public static object GetProperty(
+		[Desc( "GameObject id or unique name" )] string gameObject,
+		[Desc( "Component type name" )] string type,
+		[Desc( "Property name" )] string property )
+	{
+		var go = FindGameObject( gameObject );
+		var component = FindComponent( go, type );
+
+		if ( component.Serialize() is not JsonObject node )
+			throw new InvalidOperationException( $"Component '{type}' did not serialize to an object" );
+
+		var match = node.FirstOrDefault( kv => string.Equals( kv.Key, property, StringComparison.OrdinalIgnoreCase ) );
+		if ( match.Key is null )
+			throw new InvalidOperationException(
+				$"Component '{component.GetType().Name}' has no property '{property}' - use component_get_properties to list them" );
+
+		return new { on = component.GetType().Name, property = match.Key, value = match.Value };
+	}
+
 	[McpTool( "component_set_enabled", "Enables or disables a component.", ToolCategory.Component, Writes = true )]
 	public static object SetEnabled(
 		[Desc( "GameObject id or unique name" )] string gameObject,

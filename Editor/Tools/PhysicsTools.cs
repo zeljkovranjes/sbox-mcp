@@ -38,6 +38,25 @@ public static class PhysicsTools
 		};
 	}
 
+	[McpTool( "scene_trace_box", "Casts a box (volume) through the physics scene and reports the first hit - like scene_trace_ray but with thickness, good for 'would this fit / what's along this corridor'.", ToolCategory.Scene )]
+	public static object TraceBox(
+		[Desc( "Box half-extents [x, y, z]" )] float[] extents,
+		[Desc( "Start point [x, y, z]" )] float[] from,
+		[Desc( "End point [x, y, z]" )] float[] to )
+	{
+		var scene = RequireScene();
+		var result = scene.Trace.Box( ToVector3( extents, "extents" ), ToVector3( from, "from" ), ToVector3( to, "to" ) ).Run();
+
+		return new
+		{
+			hit = result.Hit,
+			hitObject = result.GameObject is null ? null : new { id = result.GameObject.Id, name = result.GameObject.Name },
+			point = V( result.EndPosition ),
+			normal = V( result.Normal ),
+			distance = result.Distance
+		};
+	}
+
 	[McpTool( "gameobject_drop_to_ground", "Moves a GameObject straight down onto the first solid surface below it (like Blender's drop-to-floor).", ToolCategory.GameObject, Writes = true )]
 	public static object DropToGround(
 		[Desc( "GameObject id or unique name" )] string gameObject,

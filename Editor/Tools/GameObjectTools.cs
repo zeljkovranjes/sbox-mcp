@@ -74,6 +74,52 @@ public static class GameObjectTools
 		return Describe( go );
 	}
 
+	[McpTool( "gameobject_spawn_light", "Spawns a light in one step: creates a GameObject with a PointLight, SpotLight, or DirectionalLight (optionally colored/aimed). Scenes need lighting - this is the one-call version.", ToolCategory.GameObject, Writes = true )]
+	public static object SpawnLight(
+		[Desc( "Light type: 'point', 'spot', or 'directional'" )] string lightType = "point",
+		[Desc( "Object name; defaults to the light type" )] string name = null,
+		[Desc( "World position [x, y, z]" )] float[] position = null,
+		[Desc( "Rotation [pitch, yaw, roll] - aims spot/directional lights" )] float[] rotation = null,
+		[Desc( "Light color [r, g, b] (0-1); omit for white" )] float[] color = null )
+	{
+		var session = RequireSession();
+
+		using var undo = session.UndoScope( "MCP: spawn light" ).WithGameObjectCreations().Push();
+
+		var go = session.Scene.CreateObject();
+
+		if ( position is not null )
+			go.WorldPosition = ToVector3( position, "position" );
+
+		if ( rotation is not null )
+		{
+			if ( rotation.Length != 3 )
+				throw new ArgumentException( "'rotation' must be [pitch, yaw, roll]" );
+
+			go.WorldRotation = Rotation.From( rotation[0], rotation[1], rotation[2] );
+		}
+
+		Light light = (lightType ?? "point").ToLowerInvariant() switch
+		{
+			"point" or "" => go.Components.Create<PointLight>(),
+			"spot" => go.Components.Create<SpotLight>(),
+			"directional" or "sun" or "dir" => go.Components.Create<DirectionalLight>(),
+			_ => throw new ArgumentException( "lightType must be 'point', 'spot' or 'directional'" )
+		};
+
+		go.Name = string.IsNullOrWhiteSpace( name ) ? light.GetType().Name : name;
+
+		if ( color is not null )
+		{
+			if ( color.Length is not (3 or 4) )
+				throw new ArgumentException( "'color' must be [r, g, b] or [r, g, b, a]" );
+
+			light.LightColor = new Color( color[0], color[1], color[2], color.Length > 3 ? color[3] : 1f );
+		}
+
+		return Describe( go );
+	}
+
 	[McpTool( "gameobject_delete", "Deletes a GameObject (and its children).", ToolCategory.GameObject, Writes = true )]
 	public static object Delete( [Desc( "GameObject id or unique name" )] string gameObject )
 	{

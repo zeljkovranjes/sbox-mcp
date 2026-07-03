@@ -89,6 +89,49 @@ public static class DynamicTools
 		throw new InvalidOperationException( $"'{typeName}' has no writable static property/field '{member}'" );
 	}
 
+	[McpTool( "get_component_property", "Reads ANY public property or field on a component instance by reflection - including plain C# members that aren't editor-serialized [Property] fields (component_get_properties only shows those).", ToolCategory.Component )]
+	public static object GetComponentProperty(
+		[Desc( "GameObject id or unique name" )] string gameObject,
+		[Desc( "Component type name" )] string type,
+		[Desc( "Property or field name" )] string member )
+	{
+		var component = FindComponent( FindGameObject( gameObject ), type );
+		var t = component.GetType();
+
+		if ( t.GetProperty( member, Instance ) is PropertyInfo p && p.CanRead )
+			return new { type, member, value = Present( p.GetValue( component ) ) };
+
+		if ( t.GetField( member, Instance ) is FieldInfo f )
+			return new { type, member, value = Present( f.GetValue( component ) ) };
+
+		throw new InvalidOperationException( $"'{type}' has no readable property/field '{member}' - use api_get_type to list its members" );
+	}
+
+	[McpTool( "set_component_property", "Writes ANY public property or field on a component instance by reflection. Use for plain C# members that AREN'T editor-serialized [Property] fields (e.g. SkinnedModelRenderer.PlayAnimationsInEditorScene) - for serialized fields prefer component_set_property, which is undoable and resolves resources/references. Value is JSON.", ToolCategory.Component, Writes = true )]
+	public static object SetComponentProperty(
+		[Desc( "GameObject id or unique name" )] string gameObject,
+		[Desc( "Component type name" )] string type,
+		[Desc( "Property or field name" )] string member,
+		[Desc( "New value as JSON" )] JsonElement value )
+	{
+		var component = FindComponent( FindGameObject( gameObject ), type );
+		var t = component.GetType();
+
+		if ( t.GetProperty( member, Instance ) is PropertyInfo p && p.CanWrite )
+		{
+			p.SetValue( component, Convert( value, p.PropertyType, member ) );
+			return new { type, member, set = Present( p.GetValue( component ) ) };
+		}
+
+		if ( t.GetField( member, Instance ) is FieldInfo f && !f.IsInitOnly && !f.IsLiteral )
+		{
+			f.SetValue( component, Convert( value, f.FieldType, member ) );
+			return new { type, member, set = Present( f.GetValue( component ) ) };
+		}
+
+		throw new InvalidOperationException( $"'{type}' has no writable property/field '{member}' - use api_get_type to check (it may be read-only)" );
+	}
+
 	// ---- internals -------------------------------------------------------
 
 	static Type ResolveType( string typeName )

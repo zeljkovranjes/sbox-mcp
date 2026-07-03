@@ -107,6 +107,31 @@ public static class AssetTools
 		return new { created = asset.Path, type = asset.AssetType?.FriendlyName };
 	}
 
+	[McpTool( "asset_duplicate", "Copies an existing asset to a new path (e.g. clone a material to tweak it), registers and compiles the copy.", ToolCategory.Asset, Writes = true )]
+	public static object Duplicate(
+		[Desc( "Source asset path" )] string sourcePath,
+		[Desc( "New asset path (same extension), e.g. 'materials/crate_red.vmat'" )] string destPath )
+	{
+		var source = AssetSystem.FindByPath( sourcePath )
+			?? throw new InvalidOperationException( $"No asset at '{sourcePath}' - use asset_search" );
+
+		var sourceFile = source.GetSourceFile( true );
+		if ( sourceFile is null || !File.Exists( sourceFile ) )
+			throw new InvalidOperationException( $"'{sourcePath}' has no local source file to copy" );
+
+		var absolute = ResolveNewAssetPath( destPath );
+		if ( File.Exists( absolute ) )
+			throw new InvalidOperationException( $"'{destPath}' already exists - pick another path" );
+
+		Directory.CreateDirectory( Path.GetDirectoryName( absolute ) );
+		File.Copy( sourceFile, absolute );
+
+		var asset = AssetSystem.RegisterFile( absolute );
+		asset?.Compile( true );
+
+		return new { duplicated = sourcePath, to = destPath, registered = asset is not null, compiled = asset?.IsCompiled ?? false };
+	}
+
 	[McpTool( "asset_read_raw", "Reads an asset's source file as text (KV3/JSON formats are text).", ToolCategory.Asset )]
 	public static object ReadRaw( [Desc( "Asset path or project-relative file path" )] string path )
 	{

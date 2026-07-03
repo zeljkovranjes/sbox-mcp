@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Sandbox;
@@ -33,6 +34,53 @@ public static class CodeTools
 			.ToArray();
 
 		return new { count = files.Length, files };
+	}
+
+	[McpTool( "code_search", "Searches project source files (C#/Razor/SCSS/shaders) for a substring or regex - find where a symbol is used, a class is defined, etc. Returns file:line matches.", ToolCategory.Code )]
+	public static object Search(
+		[Desc( "Text or regex to find" )] string pattern,
+		[Desc( "Treat pattern as a regular expression" )] bool regex = false,
+		[Desc( "Case-sensitive match" )] bool caseSensitive = false,
+		[Desc( "Limit to a subdirectory relative to project root" )] string subdir = null,
+		int max = 100 )
+	{
+		if ( string.IsNullOrEmpty( pattern ) )
+			throw new ArgumentException( "pattern must not be empty" );
+
+		var root = ProjectRoot;
+		var searchRoot = subdir is null ? root : ResolveInProject( subdir );
+		if ( !Directory.Exists( searchRoot ) )
+			throw new InvalidOperationException( $"No directory '{subdir}' - use code_list_files to see the layout" );
+
+		var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+		System.Text.RegularExpressions.Regex rx = null;
+		if ( regex )
+			rx = new System.Text.RegularExpressions.Regex( pattern,
+				caseSensitive ? System.Text.RegularExpressions.RegexOptions.None : System.Text.RegularExpressions.RegexOptions.IgnoreCase );
+
+		var matches = new List<object>();
+
+		foreach ( var file in Directory.EnumerateFiles( searchRoot, "*.*", SearchOption.AllDirectories ) )
+		{
+			if ( !SourceExtensions.Contains( Path.GetExtension( file ), StringComparer.OrdinalIgnoreCase ) )
+				continue;
+			if ( SkippedDirs.Any( s => file.Contains( s, StringComparison.OrdinalIgnoreCase ) ) )
+				continue;
+
+			var rel = Path.GetRelativePath( root, file ).Replace( '\\', '/' );
+			var lines = File.ReadAllLines( file );
+			for ( var i = 0; i < lines.Length; i++ )
+			{
+				var hit = rx is not null ? rx.IsMatch( lines[i] ) : lines[i].Contains( pattern, comparison );
+				if ( !hit ) continue;
+
+				matches.Add( new { file = rel, line = i + 1, text = lines[i].Trim() } );
+				if ( matches.Count >= max ) break;
+			}
+			if ( matches.Count >= max ) break;
+		}
+
+		return new { count = matches.Count, truncated = matches.Count >= max, matches };
 	}
 
 	[McpTool( "code_read_file", "Reads a project source file.", ToolCategory.Code )]

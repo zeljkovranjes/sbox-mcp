@@ -323,6 +323,32 @@ public static class ComponentTools
 		return new { attachment = attachmentName, worldPosition = V( attachment.Position ), worldRotation = A( attachment.Rotation ) };
 	}
 
+	[McpTool( "model_attach_to_bone", "Attaches (parents) a GameObject to a character's bone so it follows the animation - equip a weapon to 'hand_R', a hat to 'head'. Enables bone GameObjects automatically and snaps the item onto the bone by default.", ToolCategory.Component, Writes = true )]
+	public static object AttachToBone(
+		[Desc( "GameObject to attach (the weapon / item / accessory)" )] string gameObject,
+		[Desc( "Character GameObject that has a SkinnedModelRenderer" )] string character,
+		[Desc( "Bone name, e.g. 'hand_R' - use model_get_bone (omit boneName) to list them" )] string boneName,
+		[Desc( "Keep the item's current world position instead of snapping it onto the bone" )] bool keepWorldPosition = false )
+	{
+		var session = RequireSession();
+		var item = FindGameObject( gameObject );
+		var charGo = FindGameObject( character );
+
+		var renderer = charGo.Components.Get<SkinnedModelRenderer>()
+			?? throw new InvalidOperationException( $"'{charGo.Name}' has no SkinnedModelRenderer" );
+
+		renderer.CreateBoneObjects = true;
+		var boneGo = renderer.GetBoneObject( boneName )
+			?? throw new InvalidOperationException( $"No bone '{boneName}' - use model_get_bone (omit boneName) to list the model's bones" );
+
+		using var undo = session.UndoScope( $"MCP: attach {item.Name} to {boneName}" )
+			.WithGameObjectChanges( item, GameObjectUndoFlags.All ).Push();
+
+		item.SetParent( boneGo, keepWorldPosition );
+
+		return new { attached = item.Name, toBone = boneName, onCharacter = charGo.Name, snapped = !keepWorldPosition };
+	}
+
 	[McpTool( "component_set_enabled", "Enables or disables a component.", ToolCategory.Component, Writes = true )]
 	public static object SetEnabled(
 		[Desc( "GameObject id or unique name" )] string gameObject,

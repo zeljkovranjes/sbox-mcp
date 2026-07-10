@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using Editor;
 using Sandbox;
@@ -55,6 +56,80 @@ public static class SceneTools
 		cam.Components.Create<CameraComponent>().FieldOfView = 70f;
 
 		return new { created = new[] { "Ground", "Sun", "Camera" }, note = "ground has a collider; a directional light and camera are set - ready to build and play" };
+	}
+
+	[McpTool( "scene_load_map", "Imports a map into the scene by creating a GameObject with a MapInstance component - loads Hammer/Source2 .vmap geometry as a level. Set mapName to a map asset path like 'maps/mylevel.vmap' (find them with asset_search assetType 'vmap').", ToolCategory.Scene, Writes = true )]
+	public static object LoadMap(
+		[Desc( "Map asset name/path, e.g. 'maps/mylevel.vmap'" )] string mapName,
+		[Desc( "Name for the map GameObject" )] string objectName = "Map",
+		[Desc( "World origin [x, y, z] for the map" )] float[] position = null )
+	{
+		if ( string.IsNullOrWhiteSpace( mapName ) )
+			throw new ArgumentException( "mapName is required (e.g. 'maps/mylevel.vmap')" );
+
+		var session = RequireSession();
+
+		using var undo = session.UndoScope( "MCP: load map" ).WithGameObjectCreations().Push();
+
+		var go = session.Scene.CreateObject();
+		go.Name = string.IsNullOrWhiteSpace( objectName ) ? "Map" : objectName;
+
+		if ( position is not null )
+			go.WorldPosition = ToVector3( position, "position" );
+
+		var map = go.Components.Create<MapInstance>();
+		map.MapName = mapName;
+
+		return new { loaded = mapName, gameObject = go.Name, id = go.Id, isLoaded = map.IsLoaded };
+	}
+
+	[McpTool( "scene_add_asset", "Adds any asset to the scene, dispatching by type: a model (.vmdl) -> GameObject with a ModelRenderer; a prefab (.prefab) -> instantiated; a map (.vmap) -> GameObject with a MapInstance. The one-call 'put this asset in the scene'. For materials/textures/sounds (which aren't scene objects), apply them to a component instead.", ToolCategory.Asset, Writes = true )]
+	public static object AddAsset(
+		[Desc( "Asset path, e.g. 'models/x.vmdl', 'prefabs/y.prefab', 'maps/z.vmap'" )] string path,
+		[Desc( "Object name; defaults to the asset's file name" )] string name = null,
+		[Desc( "World position [x, y, z]" )] float[] position = null )
+	{
+		if ( AssetSystem.FindByPath( path ) is null )
+			throw new InvalidOperationException( $"No asset at '{path}' - use asset_search to find it" );
+
+		var session = RequireSession();
+		var pos = position is null ? Vector3.Zero : ToVector3( position, "position" );
+		var displayName = string.IsNullOrWhiteSpace( name ) ? Path.GetFileNameWithoutExtension( path ) : name;
+		var ext = Path.GetExtension( path ).ToLowerInvariant();
+
+		using var undo = session.UndoScope( "MCP: add asset" ).WithGameObjectCreations().Push();
+
+		switch ( ext )
+		{
+			case ".vmdl":
+			{
+				var go = session.Scene.CreateObject();
+				go.Name = displayName;
+				go.WorldPosition = pos;
+				go.Components.Create<ModelRenderer>().Model = Model.Load( path );
+				return new { added = "model", gameObject = go.Name, id = go.Id };
+			}
+			case ".prefab":
+			{
+				var prefabFile = ResourceLibrary.Get<PrefabFile>( path )
+					?? throw new InvalidOperationException( $"Prefab '{path}' could not be loaded" );
+				var prefabScene = SceneUtility.GetPrefabScene( prefabFile )
+					?? throw new InvalidOperationException( $"Prefab '{path}' could not be loaded" );
+				var instance = prefabScene.Clone( new Transform( pos ) );
+				return new { added = "prefab", gameObject = instance.Name, id = instance.Id };
+			}
+			case ".vmap":
+			{
+				var go = session.Scene.CreateObject();
+				go.Name = displayName;
+				go.WorldPosition = pos;
+				go.Components.Create<MapInstance>().MapName = path;
+				return new { added = "map", gameObject = go.Name, id = go.Id };
+			}
+			default:
+				throw new InvalidOperationException(
+					$"Don't know how to add a '{ext}' asset as a scene object. Supported: .vmdl (model), .prefab, .vmap (map). Materials/textures/sounds are applied to components (material_create, component_set_property, sound_play), not added as objects." );
+		}
 	}
 
 	[McpTool( "navmesh_generate", "Enables and bakes the scene's NavMesh from its static/ground colliders so NPCs and enemies can pathfind. Set the agent size to match your characters. Run after the level geometry exists.", ToolCategory.Scene, Writes = true )]

@@ -20,6 +20,7 @@ public static class SceneTools
 		{
 			name = scene.Name,
 			isPlaying = session.IsPlaying,
+			sceneTarget = ToolHelpers.SceneTargetMode ?? "active",
 			hasUnsavedChanges = session.HasUnsavedChanges,
 			objectCount = scene.GetAllObjects( false ).Count( o => o is not Sandbox.Scene ),
 			selection = session.Selection.OfType<Sandbox.GameObject>().Select( o => new { id = o.Id, name = o.Name } ).ToArray()
@@ -56,6 +57,81 @@ public static class SceneTools
 		cam.Components.Create<CameraComponent>().FieldOfView = 70f;
 
 		return new { created = new[] { "Ground", "Sun", "Camera" }, note = "ground has a collider; a directional light and camera are set - ready to build and play" };
+	}
+
+	[McpTool( "scene_diff", "Compares the in-memory editor scene to its saved .scene file on disk: reports unsaved changes and which top-level GameObjects were added or removed since the last save. Review it before scene_save to catch an accidental overwrite (e.g. saving over the wrong scene) and to make deliberate saves reviewable.", ToolCategory.Scene )]
+	public static object SceneDiff()
+	{
+		var session = RequireSession();
+		var scene = session.Scene;
+
+		var memObjects = scene.Children.Where( o => o is not Sandbox.Scene ).Select( o => o.Name ).ToArray();
+
+		string scenePath = null;
+		string[] diskObjects = null;
+		string diskNote = null;
+
+		try
+		{
+			scenePath = scene.Source?.ResourcePath;
+			var file = string.IsNullOrEmpty( scenePath ) ? null : AssetSystem.FindByPath( scenePath )?.GetSourceFile( true );
+
+			if ( !string.IsNullOrEmpty( file ) && File.Exists( file ) )
+			{
+				using var doc = System.Text.Json.JsonDocument.Parse( File.ReadAllText( file ) );
+				if ( doc.RootElement.TryGetProperty( "GameObjects", out var arr ) && arr.ValueKind == System.Text.Json.JsonValueKind.Array )
+				{
+					diskObjects = arr.EnumerateArray()
+						.Select( e => e.TryGetProperty( "Name", out var n ) ? n.GetString() : null )
+						.Where( n => n is not null )
+						.ToArray();
+				}
+			}
+			else
+			{
+				diskNote = "scene has not been saved to disk yet (or its source file was not found)";
+			}
+		}
+		catch ( Exception e )
+		{
+			diskNote = "could not read/parse the disk scene: " + e.Message;
+		}
+
+		var added = diskObjects is null ? null : memObjects.Except( diskObjects ).ToArray();
+		var removed = diskObjects is null ? null : diskObjects.Except( memObjects ).ToArray();
+
+		return new
+		{
+			scene = scene.Name,
+			scenePath,
+			hasUnsavedChanges = session.HasUnsavedChanges,
+			inMemoryObjects = memObjects.Length,
+			onDiskObjects = diskObjects?.Length,
+			addedSinceSave = added,
+			removedSinceSave = removed,
+			note = diskNote ?? (session.HasUnsavedChanges
+				? "In-memory scene differs from disk - scene_save to persist (or you may lose these changes on restart)."
+				: "In-memory scene matches the last save.")
+		};
+	}
+
+	[McpTool( "scene_target", "Chooses which scene the object/component tools act on while PLAY mode is running: 'editor' = the persistent edit scene (plant a toggle/route/prop that survives Stop and restarts - the fix for losing objects to restarts), 'play' = the live throwaway play clone, 'active' (default) = whatever is focused. Set 'editor' before planting persistent objects during play, then reset to 'active'. No effect when not playing.", ToolCategory.Scene, Writes = true )]
+	public static object SetSceneTarget( [Desc( "'editor', 'play', or 'active'" )] string target = "active" )
+	{
+		var t = (target ?? "active").ToLowerInvariant();
+		if ( t is not ("editor" or "play" or "active") )
+			throw new ArgumentException( "target must be 'editor', 'play', or 'active'" );
+
+		ToolHelpers.SceneTargetMode = t == "active" ? null : t;
+
+		var resolved = RequireSession();
+		return new
+		{
+			target = t,
+			resolvedScene = resolved.Scene?.Name,
+			resolvedIsPlaying = resolved.IsPlaying,
+			note = "Applies to subsequent object/component tools until changed. Reset to 'active' when done."
+		};
 	}
 
 	[McpTool( "scene_load_map", "Imports a map into the scene by creating a GameObject with a MapInstance component - loads Hammer/Source2 .vmap geometry as a level. Set mapName to a map asset path like 'maps/mylevel.vmap' (find them with asset_search assetType 'vmap').", ToolCategory.Scene, Writes = true )]

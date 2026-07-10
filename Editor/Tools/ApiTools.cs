@@ -86,11 +86,17 @@ public static class ApiTools
 			.Select( p =>
 			{
 				var pt = Nullable.GetUnderlyingType( p.PropertyType ) ?? p.PropertyType;
+				var publicGet = p.GetMethod is { IsPublic: true };
+				var publicSet = PublicSettable( p );
 				return new
 				{
 					name = p.Name,
 					type = FriendlyType( p.PropertyType ),
-					access = (p.CanRead ? "get" : "") + (p.CanWrite ? " set" : ""),
+					// only report 'set' for a PUBLIC, non-init setter - a private or
+					// init-only setter reports CanWrite=true but the compiler treats
+					// it as read-only (e.g. PlayerController.Velocity)
+					access = (publicGet ? "get" : "") + (publicSet ? " set" : ""),
+					canWrite = publicSet,
 					// inline enum options so the AI knows valid values to set
 					enumValues = pt.IsEnum ? Enum.GetNames( pt ) : null
 				};
@@ -243,7 +249,7 @@ public static class ApiTools
 
 			foreach ( var p in type.GetProperties( flags ).Where( p => p.GetIndexParameters().Length == 0 ) )
 				sb.Append( "  P " ).Append( FriendlyType( p.PropertyType ) ).Append( ' ' ).Append( p.Name )
-					.Append( ' ' ).Append( p.CanRead ? "get;" : "" ).AppendLine( p.CanWrite ? "set;" : "" );
+					.Append( ' ' ).Append( p.GetMethod is { IsPublic: true } ? "get;" : "" ).AppendLine( PublicSettable( p ) ? "set;" : "" );
 
 			foreach ( var m in type.GetMethods( flags ).Where( m => !m.IsSpecialName ) )
 				sb.Append( "  M " ).Append( FriendlyType( m.ReturnType ) ).Append( ' ' ).Append( m.Name )
@@ -266,6 +272,19 @@ public static class ApiTools
 	{
 		try { return assembly.GetExportedTypes(); }
 		catch { return Array.Empty<Type>(); }
+	}
+
+	/// <summary>True only for a PUBLIC, non-init setter - matches compiler
+	/// writability. A private or init-only setter makes CanWrite true but the
+	/// property isn't assignable in normal code (e.g. PlayerController.Velocity).</summary>
+	static bool PublicSettable( PropertyInfo p )
+	{
+		if ( p.SetMethod is not { IsPublic: true } )
+			return false;
+
+		// init-only setters carry an IsExternalInit required modifier
+		return !p.SetMethod.ReturnParameter.GetRequiredCustomModifiers()
+			.Any( m => m.Name == "IsExternalInit" );
 	}
 
 	static string FriendlyType( Type t )

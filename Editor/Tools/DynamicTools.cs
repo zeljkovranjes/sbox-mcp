@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Editor;
 using Sandbox;
 using static Sandbox.Internal.GlobalToolsNamespace;
+using SboxMcp.Integration;
 using SboxMcp.Registry;
 using static SboxMcp.Tools.ToolHelpers;
 
@@ -130,6 +133,46 @@ public static class DynamicTools
 		}
 
 		throw new InvalidOperationException( $"'{type}' has no writable property/field '{property}' - use api_get_type to check (it may be read-only)" );
+	}
+
+	[McpTool( "property_watch", "Records a component property over time (a flight recorder): samples it at `hz` for `seconds` and returns the time series. The generic tool for diagnosing freezes, drift, velocities, or animgraph params - it polls from the tool side each sample, so it works during play as the values change AND avoids the pitfall that hot-loaded GameObjectSystem recorders never instantiate into an already-running scene.", ToolCategory.Component )]
+	public static async Task<object> PropertyWatch(
+		[Desc( "GameObject id or unique name" )] string gameObject,
+		[Desc( "Component type name" )] string type,
+		[Desc( "Property or field name (e.g. 'Velocity', 'WorldRotation')" )] string property,
+		[Desc( "Samples per second (1-60)" )] int hz = 10,
+		[Desc( "Duration in seconds (0.1-30)" )] double seconds = 3 )
+	{
+		hz = Math.Clamp( hz, 1, 60 );
+		seconds = Math.Clamp( seconds, 0.1, 30 );
+		var intervalMs = Math.Max( 1, (int)(1000.0 / hz) );
+
+		var start = DateTime.Now;
+		var deadline = start.AddSeconds( seconds );
+		var samples = new List<object>();
+
+		while ( DateTime.Now < deadline )
+		{
+			// read on the main thread each tick (the async continuation may resume
+			// off it); the property changes live as the game runs
+			var reading = await MainThreadDispatcher.Run( () =>
+			{
+				var component = FindComponent( FindGameObject( gameObject ), type );
+				var t = component.GetType();
+
+				if ( t.GetProperty( property, Instance ) is PropertyInfo p && p.CanRead )
+					return Present( p.GetValue( component ) );
+				if ( t.GetField( property, Instance ) is FieldInfo f )
+					return Present( f.GetValue( component ) );
+
+				throw new InvalidOperationException( $"'{type}' has no readable property/field '{property}'" );
+			} );
+
+			samples.Add( new { tMs = Math.Round( (DateTime.Now - start).TotalMilliseconds ), value = reading } );
+			await Task.Delay( intervalMs );
+		}
+
+		return (object)new { property = $"{type}.{property}", hz, seconds, sampleCount = samples.Count, samples };
 	}
 
 	// ---- internals -------------------------------------------------------

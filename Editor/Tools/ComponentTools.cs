@@ -171,6 +171,36 @@ public static class ComponentTools
 			return;
 		}
 
+		// enums: accept the name (case-insensitive) OR the numeric ordinal and set
+		// directly. The JSON serializer silently no-ops on some enum-name forms and
+		// then writes a value that fails to deserialize on the next play-clone - a
+		// silent failure plus delayed corruption. Setting via reflection (and hard-
+		// erroring on an invalid name) avoids both.
+		if ( propInfo is not null && propInfo.CanWrite
+			&& (Nullable.GetUnderlyingType( propInfo.PropertyType ) ?? propInfo.PropertyType) is System.Type enumType && enumType.IsEnum )
+		{
+			object parsed;
+			if ( value.ValueKind == JsonValueKind.String )
+			{
+				var name = value.GetString();
+				if ( !Enum.TryParse( enumType, name, ignoreCase: true, out parsed ) )
+					throw new InvalidOperationException(
+						$"'{name}' is not a valid {enumType.Name} value for '{key}'. Options: {string.Join( ", ", Enum.GetNames( enumType ) )}" );
+			}
+			else if ( value.ValueKind == JsonValueKind.Number )
+			{
+				parsed = Enum.ToObject( enumType, value.GetInt64() );
+			}
+			else
+			{
+				throw new InvalidOperationException(
+					$"'{key}' is a {enumType.Name} enum - pass its name (e.g. \"{Enum.GetNames( enumType ).FirstOrDefault()}\") or numeric value, not {value.ValueKind}." );
+			}
+
+			propInfo.SetValue( component, parsed );
+			return;
+		}
+
 		// apply ONLY the target property: deserializing the full snapshot would
 		// re-apply every other property too, and a resource that is still
 		// loading serializes as null - the round trip would clobber it

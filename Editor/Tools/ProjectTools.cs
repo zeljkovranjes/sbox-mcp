@@ -46,7 +46,13 @@ public static class ProjectTools
 		settings.Actions.Add( new InputAction { Name = name, KeyboardCode = keyboardCode, GroupName = group } );
 		SaveInputSettings( settings );
 
-		return new { added = name, keyboard = keyboardCode, group, note = "available to code as Input.Pressed(\"" + name + "\") after entering play mode" };
+		return new
+		{
+			added = name,
+			keyboard = keyboardCode,
+			group,
+			note = "IMPORTANT: input action bindings register on the NEXT play session, not the current one. If you're already in play mode, editor_stop then editor_play (or restart) before the binding works - otherwise Input.Pressed(\"" + name + "\") silently returns false."
+		};
 	}
 
 	[McpTool( "input_remove_action", "Removes an input action from the project.", ToolCategory.Editor, Writes = true )]

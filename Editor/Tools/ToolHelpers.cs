@@ -9,9 +9,27 @@ namespace SboxMcp.Tools;
 
 internal static class ToolHelpers
 {
-	public static SceneEditorSession RequireSession() =>
-		SceneEditorSession.Active
-		?? throw new InvalidOperationException( "No scene is open in the editor - open or create a scene first" );
+	/// <summary>Ambient scene target: "editor", "play", or null (= active/focused).
+	/// Lets tools plant and modify objects in the PERSISTENT editor scene while play
+	/// mode runs (so they survive Stop and restarts) instead of the throwaway play
+	/// clone - the biggest single time-sink reported. Set via the scene_target tool.</summary>
+	public static string SceneTargetMode;
+
+	public static SceneEditorSession RequireSession()
+	{
+		// honor the ambient target: pick the editor (non-playing) or play session
+		// explicitly; fall back to Active if the requested one isn't open
+		if ( SceneTargetMode is "editor" or "play" )
+		{
+			var wantPlaying = SceneTargetMode == "play";
+			var match = SceneEditorSession.All?.FirstOrDefault( s => s is not null && s.IsPlaying == wantPlaying );
+			if ( match is not null )
+				return match;
+		}
+
+		return SceneEditorSession.Active
+			?? throw new InvalidOperationException( "No scene is open in the editor - open or create a scene first" );
+	}
 
 	public static Scene RequireScene() => RequireSession().Scene
 		?? throw new InvalidOperationException( "The active editor session has no scene" );

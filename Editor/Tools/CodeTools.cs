@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Text.Json;
+using System.Threading.Tasks;
 using Sandbox;
 using SboxMcp.Integration;
 using SboxMcp.Registry;
@@ -213,19 +216,53 @@ public static class CodeTools
 		return "Sandbox";
 	}
 
-	[McpTool( "code_run_static_method", "Invokes a public static parameterless method from project code - write a method with code_write_file, wait for hot-reload, then call it to test or inspect game state. Returns the method's ToString'd result.", ToolCategory.Code, Writes = true )]
+	[McpTool( "code_run_static_method", "Invokes a public static method from project code, optionally WITH arguments - write a method with code_write_file/code_edit_file, wait for hot-reload, then call it to test or inspect game state. Returns the method's ToString'd result.", ToolCategory.Code, Writes = true )]
 	public static object RunStaticMethod(
 		[Desc( "Type name, e.g. 'MyGame.DebugHelpers'" )] string typeName,
-		[Desc( "Public static method with no parameters" )] string methodName )
+		[Desc( "Public static method name" )] string methodName,
+		[Desc( "Positional argument values as a JSON array, e.g. [5, \"hi\", true]; omit for a no-arg method" )] JsonElement args = default )
 	{
-		var type = Sandbox.Internal.GlobalToolsNamespace.EditorTypeLibrary.GetType( typeName )
+		var typeDesc = Sandbox.Internal.GlobalToolsNamespace.EditorTypeLibrary.GetType( typeName )
 			?? throw new InvalidOperationException( $"No type '{typeName}' - is it compiled? Check code_get_compile_errors" );
 
-		var method = type.Methods.FirstOrDefault( m => m.IsStatic && m.Name == methodName && m.Parameters.Length == 0 )
-			?? throw new InvalidOperationException( $"'{typeName}' has no public static parameterless method '{methodName}'" );
+		var clrType = typeDesc.TargetType
+			?? throw new InvalidOperationException( $"'{typeName}' has no usable CLR type" );
 
-		var result = method.InvokeWithReturn<object>( null, Array.Empty<object>() );
-		return new { invoked = $"{typeName}.{methodName}", result = result?.ToString() ?? "null" };
+		var argCount = args.ValueKind == JsonValueKind.Array ? args.GetArrayLength() : 0;
+
+		var method = clrType.GetMethods( BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy )
+			.FirstOrDefault( m => m.Name == methodName && !m.IsGenericMethodDefinition && m.GetParameters().Length == argCount )
+			?? throw new InvalidOperationException(
+				$"'{typeName}' has no public static method '{methodName}' taking {argCount} argument(s) - use api_get_type to see its methods" );
+
+		// marshal each JSON arg to the parameter's type (BindOptions resolves
+		// engine value types like Vector3/Rotation) - a hard error if it can't
+		var parameters = method.GetParameters();
+		var bound = new object[parameters.Length];
+		for ( var i = 0; i < parameters.Length; i++ )
+		{
+			try
+			{
+				bound[i] = args[i].Deserialize( parameters[i].ParameterType, ToolRegistry.BindOptions );
+			}
+			catch ( Exception e )
+			{
+				throw new InvalidOperationException(
+					$"Argument {i} ('{parameters[i].Name}') could not be read as {parameters[i].ParameterType.Name}: {e.Message}" );
+			}
+		}
+
+		object result;
+		try
+		{
+			result = method.Invoke( null, bound );
+		}
+		catch ( TargetInvocationException e ) when ( e.InnerException is not null )
+		{
+			throw e.InnerException;
+		}
+
+		return new { invoked = $"{typeName}.{methodName}", args = argCount, result = result?.ToString() ?? "null" };
 	}
 
 	[McpTool( "code_delete_file", "Deletes a project source file (e.g. remove a component you no longer need). Jailed to the project; not undoable.", ToolCategory.Code, Writes = true )]
@@ -237,6 +274,64 @@ public static class CodeTools
 
 		File.Delete( absolute );
 		return new { deleted = path, note = "the editor will hot-reload; check code_get_compile_errors for references you may need to remove" };
+	}
+
+	[McpTool( "compile_await", "Waits for code compilation to SETTLE after an edit, then reports compile errors and whether the running session hot-swapped the new code. Call this right after code_write_file/code_edit_file instead of code_get_compile_errors - it fixes the log-race (compile_errors can read clean before compilation finishes) and makes an invisible hot-swap visible.", ToolCategory.Code )]
+	public static async Task<object> CompileAwait(
+		[Desc( "Max seconds to wait for compilation to go quiet" )] int timeoutSeconds = 20 )
+	{
+		var startHotload = SessionTracker.LastHotloadAt;
+		var deadline = DateTime.Now.AddSeconds( Math.Clamp( timeoutSeconds, 1, 120 ) );
+
+		var lastSeq = LogCapture.LatestSeq;
+		var lastActivity = DateTime.Now;
+		var hotSwapped = false;
+		var settled = false;
+
+		// wait until the console log stream goes quiet (compilation finished
+		// emitting diagnostics); note a hotload if the loaded assembly changed
+		while ( DateTime.Now < deadline )
+		{
+			await Task.Delay( 200 );
+
+			if ( SessionTracker.LastHotloadAt is DateTime h && h != startHotload )
+				hotSwapped = true;
+
+			var seq = LogCapture.LatestSeq;
+			if ( seq != lastSeq )
+			{
+				lastSeq = seq;
+				lastActivity = DateTime.Now;
+			}
+			else if ( (DateTime.Now - lastActivity).TotalMilliseconds >= 1200 )
+			{
+				settled = true;
+				break;
+			}
+		}
+
+		// only C# COMPILE errors (error CSxxxx) - not engine resource-load errors
+		// which also contain the word "error"
+		var errors = LogCapture.Recent( 300 )
+			.Where( l => l.Message is not null && l.Message.Contains( "error CS", StringComparison.OrdinalIgnoreCase ) )
+			.Select( l => l.Message )
+			.Distinct()
+			.Take( 25 )
+			.ToArray();
+
+		return (object)new
+		{
+			settled,
+			hotSwapped,
+			clean = errors.Length == 0,
+			errorCount = errors.Length,
+			errors,
+			note = !settled
+				? "Timed out before compilation went quiet - poll again or raise timeoutSeconds."
+				: hotSwapped
+					? "Compilation settled and a hotload swapped the new code into the running process."
+					: "Compilation settled; no hotload observed (code may already be current, or an interface-shape change forced a full reload)."
+		};
 	}
 
 	[McpTool( "code_get_compile_errors", "Gets recent compiler errors and warnings from the editor console.", ToolCategory.Code )]

@@ -14,13 +14,32 @@ public static class EditorTools
 	[McpTool( "editor_get_logs", "Reads recent editor console output (newest first) - compile diagnostics, editor warnings/errors. NOTE: game-side Log.* emitted while play mode is running may not all appear here; to inspect play-mode state, read component values with component_get_property / get_component_property (they reflect the live play scene).", ToolCategory.Editor )]
 	public static object GetLogs(
 		int count = 100,
-		[Desc( "Minimum severity: trace, info, warning or error" )] string minSeverity = null )
+		[Desc( "Minimum severity: trace, info, warning or error" )] string minSeverity = null,
+		[Desc( "Only entries newer than this cursor (pass back the 'cursor' from the previous call to poll incrementally instead of re-reading old lines)" )] long sinceSeq = 0 )
 	{
-		var logs = LogCapture.Recent( count, minSeverity )
-			.Select( l => new { time = l.Time.ToString( "HH:mm:ss" ), level = l.Level, logger = l.Logger, message = l.Message } )
+		var logs = LogCapture.Recent( count, minSeverity, sinceSeq: sinceSeq )
+			.Select( l => new { seq = l.Seq, time = l.Time.ToString( "HH:mm:ss" ), level = l.Level, logger = l.Logger, message = l.Message } )
 			.ToArray();
 
-		return new { count = logs.Length, logs };
+		// cursor = newest sequence number; pass it as sinceSeq next call for a
+		// clean "only what's new" tail
+		return new { count = logs.Length, cursor = LogCapture.LatestSeq, logs };
+	}
+
+	[McpTool( "logs_search", "Searches the captured console log by regex, minimum severity, and time window - returns matches WITH their stack traces (invaluable for errors/exceptions). Cleaner than paging editor_get_logs when hunting a specific message.", ToolCategory.Editor )]
+	public static object LogsSearch(
+		[Desc( "Regex to match in the message; omit to match everything" )] string pattern = null,
+		[Desc( "Minimum severity: trace, info, warning or error" )] string minSeverity = null,
+		[Desc( "Only entries from the last N seconds; omit for the whole buffer" )] int withinSeconds = 0,
+		int max = 50 )
+	{
+		var since = withinSeconds > 0 ? System.DateTime.Now.AddSeconds( -withinSeconds ) : (System.DateTime?)null;
+
+		var results = LogCapture.Search( pattern, minSeverity, max, since )
+			.Select( l => new { seq = l.Seq, time = l.Time.ToString( "HH:mm:ss" ), level = l.Level, logger = l.Logger, message = l.Message, stack = l.Stack } )
+			.ToArray();
+
+		return new { count = results.Length, cursor = LogCapture.LatestSeq, results };
 	}
 
 	[McpTool( "editor_clear_logs", "Clears the captured console log buffer.", ToolCategory.Editor )]
@@ -30,7 +49,7 @@ public static class EditorTools
 		return new { cleared = true };
 	}
 
-	[McpTool( "editor_screenshot", "Takes a screenshot rendered through the scene's camera and returns it as an image. Needs a CameraComponent in the scene.", ToolCategory.Editor )]
+	[McpTool( "editor_screenshot", "Captures what the game camera sees, as an image. DURING PLAY this is the player's live point of view (renders Game.ActiveScene through its active CameraComponent) - use it to see what the player sees. In edit mode it renders the edit scene's camera. For an arbitrary angle instead, use editor_screenshot_from. Needs an enabled CameraComponent.", ToolCategory.Editor )]
 	public static object Screenshot(
 		[Desc( "Image width in pixels" )] int width = 1280,
 		[Desc( "Image height in pixels" )] int height = 720 )
@@ -144,6 +163,21 @@ public static class EditorTools
 	public static object IsPlaying()
 	{
 		return new { playing = SceneEditorSession.Active?.IsPlaying ?? false };
+	}
+
+	[McpTool( "session_info", "Play-session identity and timing - use it to tell restarts apart (play clones reuse the editor's GUIDs, so 'did the scene restart?' is otherwise a guess): whether play mode is running, when the current play session started, a play-session counter, when code last hot-reloaded, and when the MCP server started.", ToolCategory.Editor )]
+	public static object SessionInfo()
+	{
+		string Stamp( System.DateTime? t ) => t?.ToString( "yyyy-MM-dd HH:mm:ss" );
+
+		return new
+		{
+			playing = SboxMcp.Integration.SessionTracker.IsPlaying,
+			playSessionCount = SboxMcp.Integration.SessionTracker.PlaySessionCount,
+			playStartedAt = Stamp( SboxMcp.Integration.SessionTracker.PlayStartedAt ),
+			lastHotloadAt = Stamp( SboxMcp.Integration.SessionTracker.LastHotloadAt ),
+			serverStartedAt = Stamp( SboxMcp.Integration.SessionTracker.ServerStartedAt )
+		};
 	}
 
 	[McpTool( "editor_run_console_command", "Runs an editor console command (e.g. 'clear', convars).", ToolCategory.Editor, Writes = true )]

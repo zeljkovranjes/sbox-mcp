@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Editor;
 using static Sandbox.Internal.GlobalToolsNamespace;
 
@@ -19,7 +20,13 @@ public static class SessionTracker
 	public static DateTime? PlayStartedAt { get; private set; }
 	public static DateTime? LastHotloadAt { get; private set; }
 
-	public static bool IsPlaying => SceneEditorSession.Active?.IsPlaying ?? false;
+	// check ALL sessions, not just Active: during HTTP-driven play the "active"
+	// session can still be the editor one, so Active?.IsPlaying under-reports
+	public static bool IsPlaying =>
+		SceneEditorSession.All?.Any( s => s is not null && s.IsPlaying ) ?? false;
+
+	/// <summary>Monotonic editor-frame counter (drives perf_get_stats' FPS calc).</summary>
+	public static long FrameCount { get; private set; }
 
 	/// <summary>How many times play mode has been entered this editor run
 	/// (persisted so a hotload doesn't reset it mid-session).</summary>
@@ -32,6 +39,8 @@ public static class SessionTracker
 	[EditorEvent.Frame]
 	static void OnFrame()
 	{
+		FrameCount++;
+
 		var playing = IsPlaying;
 
 		// first frame after (re)load: sync without counting, so a hotload during

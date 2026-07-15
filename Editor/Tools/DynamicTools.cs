@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Editor;
 using Sandbox;
@@ -24,8 +25,8 @@ public static class DynamicTools
 	const BindingFlags Instance = BindingFlags.Public | BindingFlags.Instance;
 	const BindingFlags Static = BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy;
 
-	[McpTool( "invoke_static", "Calls any public static method on any type (e.g. Sound.Play, Game.ActiveScene helpers). Args are JSON, matched to parameters by position; GameObject/Component params accept an id string.", ToolCategory.Editor, Writes = true )]
-	public static object InvokeStatic(
+	[McpTool( "invoke_static", "Calls any public static method on any type (e.g. Sound.Play, Game.ActiveScene helpers). Args are JSON, matched to parameters by position; GameObject/Component params accept an id string. If the method returns a Task/Task<T> it is awaited and its result returned (not the Task object).", ToolCategory.Editor, Writes = true )]
+	public static async Task<object> InvokeStatic(
 		[Desc( "Type name or full name, e.g. 'Sandbox.Sound'" )] string typeName,
 		[Desc( "Static method name" )] string method,
 		[Desc( "Positional argument values as a JSON array, e.g. [\"sounds/x.sound\"]" )] JsonElement args = default )
@@ -35,11 +36,11 @@ public static class DynamicTools
 			.Where( m => m.Name == method && !m.IsGenericMethodDefinition )
 			.ToArray();
 
-		return InvokeBest( candidates, null, args, $"{typeName}.{method}" );
+		return await InvokeBest( candidates, null, NormalizeArgs( args ), $"{typeName}.{method}" );
 	}
 
-	[McpTool( "invoke_component_method", "Calls any public method on a component instance (e.g. Rigidbody.ApplyForce, PlayerController.Jump). Args are JSON positional; GameObject/Component params accept an id string.", ToolCategory.Component, Writes = true )]
-	public static object InvokeComponentMethod(
+	[McpTool( "invoke_component_method", "Calls any public method on a component instance (e.g. Rigidbody.ApplyForce, PlayerController.Jump). Args are JSON positional; GameObject/Component params accept an id string. If the method returns a Task/Task<T> it is awaited and its result returned.", ToolCategory.Component, Writes = true )]
+	public static async Task<object> InvokeComponentMethod(
 		[Desc( "GameObject id or unique name" )] string gameObject,
 		[Desc( "Component type name" )] string type,
 		[Desc( "Method name" )] string method,
@@ -50,7 +51,53 @@ public static class DynamicTools
 			.Where( m => m.Name == method && !m.IsGenericMethodDefinition )
 			.ToArray();
 
-		return InvokeBest( candidates, component, args, $"{type}.{method}" );
+		return await InvokeBest( candidates, component, NormalizeArgs( args ), $"{type}.{method}" );
+	}
+
+	[McpTool( "invoke_and_await_log", "Calls a public static method, then blocks until a console log line matches `logPattern` (regex) or it times out - collapses the invoke + sleep + editor_get_logs-poll pattern into one call, returning the matching line(s) and stack. NOTE: game-side Log.* during play may not reach the editor log stream; to observe live play-scene state prefer property_watch / get_component_property (which now read the live play scene).", ToolCategory.Editor, Writes = true )]
+	public static async Task<object> InvokeAndAwaitLog(
+		[Desc( "Type name or full name, e.g. 'MyGame.DebugHelpers'" )] string typeName,
+		[Desc( "Static method name" )] string method,
+		[Desc( "Regex to wait for in the console log, e.g. 'spawned \\d+ enemies'" )] string logPattern,
+		[Desc( "Positional argument values as a JSON array" )] JsonElement args = default,
+		[Desc( "Max seconds to wait for a matching log line" )] int timeoutSeconds = 10 )
+	{
+		if ( string.IsNullOrWhiteSpace( logPattern ) )
+			throw new ArgumentException( "logPattern is required - it's the regex this tool waits for. For a plain invoke without waiting, use invoke_static." );
+
+		Regex regex;
+		try { regex = new Regex( logPattern, RegexOptions.IgnoreCase ); }
+		catch ( Exception e ) { throw new ArgumentException( $"logPattern is not a valid regex: {e.Message}" ); }
+
+		// snapshot the log cursor BEFORE firing so we only match new lines
+		var sinceSeq = LogCapture.LatestSeq;
+
+		var type = ResolveType( typeName );
+		var candidates = type.GetMethods( Static )
+			.Where( m => m.Name == method && !m.IsGenericMethodDefinition )
+			.ToArray();
+		var invokeResult = await InvokeBest( candidates, null, NormalizeArgs( args ), $"{typeName}.{method}" );
+
+		var deadline = DateTime.Now.AddSeconds( Math.Clamp( timeoutSeconds, 1, 120 ) );
+		while ( DateTime.Now < deadline )
+		{
+			var hit = LogCapture.Recent( 500, null, sinceSeq: sinceSeq )
+				.Where( l => l.Message is not null && regex.IsMatch( l.Message ) )
+				.Select( l => new { seq = l.Seq, time = l.Time.ToString( "HH:mm:ss" ), level = l.Level, message = l.Message, stack = l.Stack } )
+				.FirstOrDefault();
+
+			if ( hit is not null )
+				return new { invoked = invokeResult, matched = true, log = hit };
+
+			await Task.Delay( 150 );
+		}
+
+		return new
+		{
+			invoked = invokeResult,
+			matched = false,
+			note = $"No console line matched /{logPattern}/ within {timeoutSeconds}s. If this was a game-side Log.* emitted during play, the editor log stream may not capture it - read the resulting state with get_component_property / property_watch instead."
+		};
 	}
 
 	[McpTool( "get_static_property", "Reads any public static property or field (e.g. Time.Now, Game.IsPlaying).", ToolCategory.Editor )]
@@ -199,12 +246,12 @@ public static class DynamicTools
 			?? throw new InvalidOperationException( $"No type '{typeName}' - use api_search to find it (try the full name like 'Sandbox.{typeName}')" );
 	}
 
-	static object InvokeBest( MethodInfo[] candidates, object instance, JsonElement args, string label )
+	static async Task<object> InvokeBest( MethodInfo[] candidates, object instance, JsonElement[] args, string label )
 	{
 		if ( candidates.Length == 0 )
 			throw new InvalidOperationException( $"No method '{label}' - use api_get_type to list methods and their signatures" );
 
-		var argCount = args.ValueKind == JsonValueKind.Array ? args.GetArrayLength() : 0;
+		var argCount = args.Length;
 
 		// try every count-compatible overload, binding args; use the first that
 		// binds cleanly (so Play(string) is tried even if Play(SoundEvent) came first)
@@ -246,25 +293,30 @@ public static class DynamicTools
 				continue; // this overload's args don't fit - try the next
 			}
 
+			object result;
 			try
 			{
-				var result = method.Invoke( instance, bound );
-
-				var outputs = parameters
-					.Where( p => p.IsOut )
-					.ToDictionary( p => p.Name, p => Present( bound[p.Position] ) );
-
-				return new
-				{
-					invoked = label,
-					returned = method.ReturnType == typeof( void ) ? "void" : Present( result ),
-					outputs = outputs.Count > 0 ? outputs : null
-				};
+				result = method.Invoke( instance, bound );
 			}
 			catch ( TargetInvocationException e ) when ( e.InnerException is not null )
 			{
 				throw e.InnerException;
 			}
+
+			// await a returned Task/Task<T> so callers get the real result, not the
+			// Task object (the single biggest reported time-sink)
+			var awaited = await AwaitIfTask( result );
+
+			var outputs = parameters
+				.Where( p => p.IsOut )
+				.ToDictionary( p => p.Name, p => Present( bound[p.Position] ) );
+
+			return new
+			{
+				invoked = label,
+				returned = method.ReturnType == typeof( void ) ? "void" : Present( awaited ),
+				outputs = outputs.Count > 0 ? outputs : null
+			};
 		}
 
 		throw lastBindError ?? new ArgumentException( $"Arguments did not match any overload of '{label}' - use api_get_type to check signatures" );

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Editor;
 using Sandbox;
 using SboxMcp.Integration;
@@ -177,6 +178,30 @@ public static class EditorTools
 			playStartedAt = Stamp( SboxMcp.Integration.SessionTracker.PlayStartedAt ),
 			lastHotloadAt = Stamp( SboxMcp.Integration.SessionTracker.LastHotloadAt ),
 			serverStartedAt = Stamp( SboxMcp.Integration.SessionTracker.ServerStartedAt )
+		};
+	}
+
+	[McpTool( "perf_get_stats", "Measures the frame rate over a short window (by sampling the editor frame counter) and reports FPS + average frame time - use it to quantitatively confirm a perf fix (e.g. removing debug-draw overdraw) instead of eyeballing sphere counts. During play this reflects the running game's tick loop.", ToolCategory.Editor )]
+	public static async Task<object> PerfGetStats(
+		[Desc( "Measurement window in seconds (0.2-10)" )] double seconds = 1.0 )
+	{
+		seconds = Math.Clamp( seconds, 0.2, 10 );
+
+		var startFrames = SessionTracker.FrameCount;
+		var startTime = DateTime.Now;
+		await Task.Delay( (int)(seconds * 1000) );
+		var elapsed = (DateTime.Now - startTime).TotalSeconds;
+		var frames = SessionTracker.FrameCount - startFrames;
+		var fps = elapsed > 0 ? frames / elapsed : 0;
+
+		return (object)new
+		{
+			fps = Math.Round( fps, 1 ),
+			frameTimeMs = fps > 0 ? (object)Math.Round( 1000.0 / fps, 2 ) : null,
+			frames,
+			windowSeconds = Math.Round( elapsed, 2 ),
+			playing = SessionTracker.IsPlaying,
+			note = "FPS is the editor frame loop (which is the game tick loop during play). GPU draw-call counters aren't exposed by the editor API. Measure before and after a change to compare."
 		};
 	}
 

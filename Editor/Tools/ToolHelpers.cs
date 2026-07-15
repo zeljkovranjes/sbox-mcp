@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
+using System.Threading.Tasks;
 using Editor;
 using Sandbox;
 using static Sandbox.Internal.GlobalToolsNamespace;
@@ -15,24 +17,113 @@ internal static class ToolHelpers
 	/// clone - the biggest single time-sink reported. Set via the scene_target tool.</summary>
 	public static string SceneTargetMode;
 
+	static SceneEditorSession PlaySession() =>
+		SceneEditorSession.All?.FirstOrDefault( s => s is not null && s.IsPlaying );
+
+	static SceneEditorSession EditorSession() =>
+		SceneEditorSession.All?.FirstOrDefault( s => s is not null && !s.IsPlaying );
+
+	static InvalidOperationException NoScene() =>
+		new( "No scene is open in the editor - open or create a scene first" );
+
 	public static SceneEditorSession RequireSession()
 	{
-		// honor the ambient target: pick the editor (non-playing) or play session
-		// explicitly; fall back to Active if the requested one isn't open
-		if ( SceneTargetMode is "editor" or "play" )
-		{
-			var wantPlaying = SceneTargetMode == "play";
-			var match = SceneEditorSession.All?.FirstOrDefault( s => s is not null && s.IsPlaying == wantPlaying );
-			if ( match is not null )
-				return match;
-		}
+		var play = PlaySession();
+		var editor = EditorSession();
 
-		return SceneEditorSession.Active
-			?? throw new InvalidOperationException( "No scene is open in the editor - open or create a scene first" );
+		if ( SceneTargetMode == "editor" )
+			return editor ?? SceneEditorSession.Active ?? throw NoScene();
+
+		if ( SceneTargetMode == "play" )
+			return play ?? throw new InvalidOperationException(
+				"scene_target is set to 'play' but play mode isn't running - editor_play first, or scene_target active." );
+
+		// default: follow the LIVE game while it's playing so reads/writes hit the
+		// ticking play-scene clone. Play clones reuse the editor object GUIDs, so a
+		// by-guid lookup on the dormant editor scene silently returns a copy that
+		// never ticks (the reported get_component_property/get_transform bug).
+		return play ?? editor ?? SceneEditorSession.Active ?? throw NoScene();
 	}
 
-	public static Scene RequireScene() => RequireSession().Scene
-		?? throw new InvalidOperationException( "The active editor session has no scene" );
+	public static Scene RequireScene()
+	{
+		var session = RequireSession();
+
+		// Game.ActiveScene is the exact scene the engine ticks during play; prefer
+		// it over the session's Scene so live values are read, unless the caller
+		// explicitly targeted the editor scene
+		if ( session.IsPlaying && SceneTargetMode != "editor" && Game.ActiveScene is not null )
+			return Game.ActiveScene;
+
+		return session.Scene
+			?? throw new InvalidOperationException( "The active editor session has no scene" );
+	}
+
+	/// <summary>Normalizes a tool's JSON <c>args</c> element into a positional
+	/// argument list. Accepts a real JSON array, a STRING that encodes a JSON array
+	/// (MCP clients frequently stringify it), null/undefined (= no args), or a lone
+	/// scalar/object (= a single argument). This is why multi-arg invoke calls used
+	/// to fail with "no overload taking 0 arguments".</summary>
+	public static JsonElement[] NormalizeArgs( JsonElement args )
+	{
+		switch ( args.ValueKind )
+		{
+			case JsonValueKind.Undefined:
+			case JsonValueKind.Null:
+				return Array.Empty<JsonElement>();
+
+			case JsonValueKind.Array:
+				return args.EnumerateArray().Select( e => e.Clone() ).ToArray();
+
+			case JsonValueKind.String:
+				var s = args.GetString();
+				var trimmed = s?.TrimStart();
+				if ( trimmed is not null && (trimmed.StartsWith( '[' ) || trimmed.StartsWith( '{' )) )
+				{
+					try
+					{
+						using var doc = JsonDocument.Parse( s );
+						return doc.RootElement.ValueKind == JsonValueKind.Array
+							? doc.RootElement.EnumerateArray().Select( e => e.Clone() ).ToArray()
+							: new[] { doc.RootElement.Clone() };
+					}
+					catch { /* not actually JSON - treat as one literal string arg */ }
+				}
+				return new[] { args.Clone() };
+
+			default:
+				// a lone scalar (number/bool) or object → a single positional argument
+				return new[] { args.Clone() };
+		}
+	}
+
+	/// <summary>If the value is a Task/Task&lt;T&gt;, awaits it (with a timeout) and
+	/// returns its result (or a completion marker for a non-generic Task); otherwise
+	/// returns the value unchanged. Fixes async engine/game methods whose returned
+	/// Task was previously handed back unawaited (you got "System.Threading.Tasks.Task`1[...]"
+	/// instead of the actual result).</summary>
+	public static async Task<object> AwaitIfTask( object value, int timeoutMs = 25000 )
+	{
+		if ( value is not Task task )
+			return value;
+
+		var finished = await Task.WhenAny( task, Task.Delay( timeoutMs ) );
+		if ( finished != task )
+			throw new InvalidOperationException(
+				$"The method returned a Task that didn't complete within {timeoutMs / 1000}s - it may be long-running or awaiting something that never completes." );
+
+		await task; // surface any exception thrown inside the task
+
+		var tt = task.GetType();
+		if ( tt.IsGenericType && tt.GetGenericTypeDefinition() == typeof( Task<> ) )
+		{
+			var inner = tt.GetProperty( "Result" )?.GetValue( task );
+			// Task (non-generic) is compiled as Task<VoidTaskResult> - no real value
+			return inner is null || inner.GetType().Name == "VoidTaskResult" ? "(task completed)" : inner;
+		}
+
+		return "(task completed)";
+	}
 
 	/// <summary>
 	/// Resolves a GameObject by id (preferred) or by unique name.

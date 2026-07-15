@@ -244,19 +244,36 @@ public static class SceneTools
 		if ( nav is null || !nav.IsEnabled )
 			throw new InvalidOperationException( "The scene's NavMesh is not enabled - call navmesh_generate first" );
 
+		var target = ToVector3( to, "to" );
 		var path = nav.CalculatePath( new Sandbox.Navigation.CalculatePathRequest
 		{
 			Start = ToVector3( from, "from" ),
-			Target = ToVector3( to, "to" )
+			Target = target
 		} );
 
 		var points = path.Points is null ? Array.Empty<float[]>() : path.Points.Select( p => V( p.Position ) ).ToArray();
+		var reaches = path.Status == Sandbox.Navigation.NavMeshPathStatus.Complete;
+
+		// a Partial path's LAST waypoint is the closest reachable point, which the
+		// engine leaves short of the target - callers must gate on `reaches`, never
+		// on distance-to-last-point, or they'll treat unreachable targets as reached
+		var lastPos = points.Length > 0 ? path.Points.Last().Position : (Vector3?)null;
+		var endsAt = lastPos.HasValue ? V( lastPos.Value ) : null;
+		var gap = lastPos.HasValue ? Vector3.DistanceBetween( lastPos.Value, target ) : (float?)null;
+
 		return new
 		{
-			found = path.Status == Sandbox.Navigation.NavMeshPathStatus.Complete,
+			reaches,                 // TRUE only when the target is actually reachable
+			found = reaches,         // kept for back-compat
 			status = path.Status.ToString(),
 			waypoints = points.Length,
-			points
+			endsAt,                  // real endpoint of the path (may be short of the target)
+			requestedEnd = V( target ),
+			endpointGap = gap.HasValue ? (object)Math.Round( gap.Value, 2 ) : null,
+			points,
+			note = reaches
+				? null
+				: "PARTIAL/failed path: the target is NOT reachable. 'endsAt' is the closest reachable point (endpointGap units short) - do not treat it as the destination. Gate movement/AI logic on 'reaches'."
 		};
 	}
 

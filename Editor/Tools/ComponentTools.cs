@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Editor;
@@ -13,6 +14,107 @@ namespace SboxMcp.Tools;
 
 public static class ComponentTools
 {
+	[McpTool( "inspector_describe", "Describes how a component's members WILL render in the editor Inspector - per property: display name, group/tab, inferred control kind (slider/enum-dropdown/toggle/color-picker/asset-picker/object-reference/...), [Range] bounds and enum options, plus which inspector attributes ([Property]/[Group]/[Range]/[Title]/[Category]/[Hide]/...) are actually present on the LIVE build. Use it to confirm inspector attributes registered correctly without eyeballing a screenshot (offscreen inspector pixel-capture isn't supported by the editor API).", ToolCategory.Component )]
+	public static object InspectorDescribe(
+		[Desc( "GameObject id or unique name" )] string gameObject,
+		[Desc( "Component type name" )] string type )
+	{
+		var component = FindComponent( FindGameObject( gameObject ), type );
+		var t = component.GetType();
+
+		// an attribute is matched by simple name so we don't need a hard reference to
+		// every s&box attribute type; read a named value off it defensively
+		static bool Has( object[] attrs, string name ) =>
+			attrs.Any( a => a.GetType().Name == name || a.GetType().Name == name + "Attribute" );
+
+		static object Val( object[] attrs, string attrName, string member )
+		{
+			var a = attrs.FirstOrDefault( x => x.GetType().Name == attrName || x.GetType().Name == attrName + "Attribute" );
+			if ( a is null ) return null;
+			try { return a.GetType().GetProperty( member )?.GetValue( a ) ?? a.GetType().GetField( member )?.GetValue( a ); }
+			catch { return null; }
+		}
+
+		string ControlKind( Type pt, object[] attrs )
+		{
+			var u = Nullable.GetUnderlyingType( pt ) ?? pt;
+			if ( u.IsEnum ) return "enum-dropdown";
+			if ( u == typeof( bool ) ) return "toggle";
+			if ( Has( attrs, "Range" ) ) return "slider";
+			if ( u == typeof( Color ) ) return "color-picker";
+			if ( u == typeof( int ) || u == typeof( float ) || u == typeof( double ) || u == typeof( long ) ) return "number";
+			if ( u == typeof( string ) ) return Has( attrs, "TextArea" ) ? "text-area" : "text";
+			if ( u == typeof( Vector3 ) || u == typeof( Vector2 ) || u == typeof( Rotation ) || u == typeof( Angles ) ) return "vector";
+			if ( typeof( Resource ).IsAssignableFrom( u ) ) return "asset-picker";
+			if ( typeof( GameObject ).IsAssignableFrom( u ) || typeof( Component ).IsAssignableFrom( u ) ) return "object-reference";
+			return u.Name;
+		}
+
+		var members = new List<object>();
+		var groupOrder = new List<string>();
+		foreach ( var p in t.GetProperties( BindingFlags.Public | BindingFlags.Instance ) )
+		{
+			if ( !p.CanRead ) continue;
+
+			var attrs = p.GetCustomAttributes( true );
+
+			// what the inspector actually shows: an explicit [Property], or a public
+			// read/write property that isn't [Hide]/[JsonIgnore]'d
+			var shown = Has( attrs, "Property" ) || (p.CanWrite && !Has( attrs, "Hide" ) && !Has( attrs, "JsonIgnore" ));
+			if ( !shown ) continue;
+
+			var present = new[] { "Property", "Group", "Range", "Title", "Category", "Description",
+					"Hide", "ReadOnly", "Step", "Placeholder", "TextArea", "Order", "ShowIf", "HideIf", "ToggleGroup", "FeatureEnabled" }
+				.Where( n => Has( attrs, n ) ).ToArray();
+
+			var min = Val( attrs, "Range", "Min" ) ?? Val( attrs, "Range", "min" );
+			var max = Val( attrs, "Range", "Max" ) ?? Val( attrs, "Range", "max" );
+			var pt = Nullable.GetUnderlyingType( p.PropertyType ) ?? p.PropertyType;
+			var group = (Val( attrs, "Group", "Value" ) ?? Val( attrs, "Group", "Name" )) as string;
+
+			if ( !string.IsNullOrEmpty( group ) && !groupOrder.Contains( group ) )
+				groupOrder.Add( group );
+
+			members.Add( new
+			{
+				name = p.Name,
+				displayName = (Val( attrs, "Title", "Value" ) ?? Val( attrs, "Title", "Name" )) as string ?? Humanize( p.Name ),
+				propertyType = pt.Name,
+				control = ControlKind( p.PropertyType, attrs ),
+				group,
+				category = (Val( attrs, "Category", "Value" ) ?? Val( attrs, "Category", "Name" )) as string,
+				range = min is not null || max is not null ? new { min, max } : null,
+				enumOptions = pt.IsEnum ? Enum.GetNames( pt ) : null,
+				editable = p.CanWrite,
+				attributes = present
+			} );
+		}
+
+		return new
+		{
+			component = t.Name,
+			gameObject = component.GameObject?.Name,
+			groupCount = groupOrder.Count,
+			groups = groupOrder.ToArray(),
+			memberCount = members.Count,
+			members,
+			note = "control/displayName are inferred from the live build's attributes (reflection), matching how the Inspector builds its widgets. A missing group or wrong control kind means the attribute didn't apply - recompile and re-check."
+		};
+	}
+
+	static string Humanize( string name )
+	{
+		if ( string.IsNullOrEmpty( name ) ) return name;
+		var sb = new System.Text.StringBuilder();
+		for ( var i = 0; i < name.Length; i++ )
+		{
+			if ( i > 0 && char.IsUpper( name[i] ) && !char.IsUpper( name[i - 1] ) )
+				sb.Append( ' ' );
+			sb.Append( name[i] );
+		}
+		return sb.ToString();
+	}
+
 	[McpTool( "component_list_types", "Searches available component types (ModelRenderer, Rigidbody, custom components...).", ToolCategory.Component )]
 	public static object ListTypes(
 		[Desc( "Name filter (case-insensitive substring); omit for all" )] string query = null,

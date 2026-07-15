@@ -216,8 +216,8 @@ public static class CodeTools
 		return "Sandbox";
 	}
 
-	[McpTool( "code_run_static_method", "Invokes a public static method from project code, optionally WITH arguments - write a method with code_write_file/code_edit_file, wait for hot-reload, then call it to test or inspect game state. Returns the method's ToString'd result.", ToolCategory.Code, Writes = true )]
-	public static object RunStaticMethod(
+	[McpTool( "code_run_static_method", "Invokes a public static method from project code, optionally WITH arguments - write a method with code_write_file/code_edit_file, wait for hot-reload, then call it to test or inspect game state. If the method returns a Task/Task<T> it is AWAITED and its result returned (not the Task object). Returns the result's ToString.", ToolCategory.Code, Writes = true )]
+	public static async Task<object> RunStaticMethod(
 		[Desc( "Type name, e.g. 'MyGame.DebugHelpers'" )] string typeName,
 		[Desc( "Public static method name" )] string methodName,
 		[Desc( "Positional argument values as a JSON array, e.g. [5, \"hi\", true]; omit for a no-arg method" )] JsonElement args = default )
@@ -228,7 +228,10 @@ public static class CodeTools
 		var clrType = typeDesc.TargetType
 			?? throw new InvalidOperationException( $"'{typeName}' has no usable CLR type" );
 
-		var argCount = args.ValueKind == JsonValueKind.Array ? args.GetArrayLength() : 0;
+		// tolerate args passed as a real array OR a stringified array (MCP clients
+		// often stringify) - was the cause of spurious "taking 0 arguments" errors
+		var argList = ToolHelpers.NormalizeArgs( args );
+		var argCount = argList.Length;
 
 		var method = clrType.GetMethods( BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy )
 			.FirstOrDefault( m => m.Name == methodName && !m.IsGenericMethodDefinition && m.GetParameters().Length == argCount )
@@ -243,7 +246,7 @@ public static class CodeTools
 		{
 			try
 			{
-				bound[i] = args[i].Deserialize( parameters[i].ParameterType, ToolRegistry.BindOptions );
+				bound[i] = argList[i].Deserialize( parameters[i].ParameterType, ToolRegistry.BindOptions );
 			}
 			catch ( Exception e )
 			{
@@ -262,7 +265,58 @@ public static class CodeTools
 			throw e.InnerException;
 		}
 
-		return new { invoked = $"{typeName}.{methodName}", args = argCount, result = result?.ToString() ?? "null" };
+		// await a Task/Task<T> so a diagnostic method can be async without the
+		// caller getting back "System.Threading.Tasks.Task`1[System.String]"
+		var awaited = await ToolHelpers.AwaitIfTask( result );
+
+		return new { invoked = $"{typeName}.{methodName}", args = argCount, result = awaited?.ToString() ?? "null" };
+	}
+
+	[McpTool( "build_info", "Reports the identity of the currently-loaded build: a server buildId plus, for a given type, the MVID/timestamp of the assembly that type lives in. Call it after a compile to confirm your NEW code is actually live (the MVID changes on every recompile) - replaces planting a throwaway Log.Info canary to check for stale assemblies.", ToolCategory.Code )]
+	public static object BuildInfo(
+		[Desc( "Optional type to inspect, e.g. 'MyGame.DebugHelpers' - reports the assembly that holds it" )] string typeName = null )
+	{
+		string Mvid( Assembly a ) => a.ManifestModule.ModuleVersionId.ToString( "N" ).Substring( 0, 12 );
+
+		string LastWrite( Assembly a )
+		{
+			try
+			{
+				return string.IsNullOrEmpty( a.Location ) || !File.Exists( a.Location )
+					? null
+					: File.GetLastWriteTime( a.Location ).ToString( "yyyy-MM-dd HH:mm:ss" );
+			}
+			catch { return null; }
+		}
+
+		var server = Assembly.GetExecutingAssembly();
+		object typeBuild = null;
+
+		if ( !string.IsNullOrWhiteSpace( typeName ) )
+		{
+			var desc = Sandbox.Internal.GlobalToolsNamespace.EditorTypeLibrary.GetType( typeName );
+			var clr = desc?.TargetType
+				?? throw new InvalidOperationException( $"No type '{typeName}' - is it compiled? Check code_get_compile_errors" );
+
+			var asm = clr.Assembly;
+			typeBuild = new
+			{
+				type = clr.FullName,
+				assembly = asm.GetName().Name,
+				buildId = Mvid( asm ),
+				location = string.IsNullOrEmpty( asm.Location ) ? "(in-memory / hot-loaded)" : asm.Location,
+				assemblyLastWrite = LastWrite( asm )
+			};
+		}
+
+		return new
+		{
+			serverBuildId = Mvid( server ),
+			serverAssembly = server.GetName().Name,
+			serverLastWrite = LastWrite( server ),
+			type = typeBuild,
+			note = "buildId (assembly MVID) changes on every recompile. Store it, recompile, call again: same buildId = the running process is still on the OLD build (stale); different = the new code is live."
+		};
 	}
 
 	[McpTool( "code_delete_file", "Deletes a project source file (e.g. remove a component you no longer need). Jailed to the project; not undoable.", ToolCategory.Code, Writes = true )]
@@ -326,6 +380,10 @@ public static class CodeTools
 			clean = errors.Length == 0,
 			errorCount = errors.Length,
 			errors,
+			// MVID of the running server assembly - changes on every recompile, so a
+			// caller can tell "is the code I'm calling actually the build I just made?"
+			// apart without planting a throwaway Log.Info canary. Compare across calls.
+			buildId = Assembly.GetExecutingAssembly().ManifestModule.ModuleVersionId.ToString( "N" ).Substring( 0, 12 ),
 			note = !settled
 				? "Timed out before compilation went quiet - poll again or raise timeoutSeconds."
 				: hotSwapped

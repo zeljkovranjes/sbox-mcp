@@ -21,13 +21,31 @@ public static class McpSettings
 	public const int DefaultPort = 9090;
 
 	static int _port = DefaultPort;
+	static bool _portFromEnv;
 	static bool _autoStart = true;
 	static PermissionMode _mode = PermissionMode.FullAccess;
+
+	/// <summary>True when the port came from the SBOX_MCP_PORT env var - used to
+	/// isolate a second editor instance on its own port without persisting to (and
+	/// disturbing) the shared EditorCookie every instance reads.</summary>
+	public static bool IsPortFromEnv => _portFromEnv;
 
 	/// <summary>Called once from the editor main thread before anything reads settings.</summary>
 	internal static void LoadFromCookies()
 	{
-		_port = EditorCookie.Get( "SboxMcp.Port", DefaultPort );
+		// env override wins so you can launch an isolated instance:
+		// SBOX_MCP_PORT=9191 sbox-dev.exe ... -> binds 9191, cookie untouched
+		var env = Environment.GetEnvironmentVariable( "SBOX_MCP_PORT" );
+		if ( int.TryParse( env, out var envPort ) && envPort is > 0 and < 65536 )
+		{
+			_port = envPort;
+			_portFromEnv = true;
+		}
+		else
+		{
+			_port = EditorCookie.Get( "SboxMcp.Port", DefaultPort );
+		}
+
 		_autoStart = EditorCookie.Get( "SboxMcp.AutoStart", true );
 		_mode = EditorCookie.Get( "SboxMcp.PermissionMode", PermissionMode.FullAccess );
 		LoadExtras();
@@ -36,7 +54,8 @@ public static class McpSettings
 	public static int Port
 	{
 		get => _port;
-		set { _port = value; EditorCookie.Set( "SboxMcp.Port", value ); }
+		// don't clobber the shared cookie when an env override is driving the port
+		set { _port = value; if ( !_portFromEnv ) EditorCookie.Set( "SboxMcp.Port", value ); }
 	}
 
 	public static bool AutoStart

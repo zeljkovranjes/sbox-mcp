@@ -67,8 +67,10 @@ public class McpDock : Widget
 			// restore the last size the user resized it to
 			dock.Size = McpSettings.DockSize;
 
-			// floating by default - the user can dock it wherever they like
-			EditorWindow.DockManager.AddDock( null, dock, DockArea.Floating );
+			// dock to the right by default (s&box removed DockArea.Floating and the
+			// widget overload now takes a title/icon); the user can drag it out to
+			// float or re-dock it anywhere
+			EditorWindow.DockManager.AddDock( "MCP", "hub", dock, DockArea.Right );
 			dock.Size = McpSettings.DockSize;
 		}
 

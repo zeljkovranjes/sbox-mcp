@@ -67,13 +67,18 @@ public class McpDock : Widget
 			// restore the last size the user resized it to
 			dock.Size = McpSettings.DockSize;
 
-			// dock to the right by default (s&box removed DockArea.Floating and the
-			// widget overload now takes a title/icon); the user can drag it out to
-			// float or re-dock it anywhere
-			EditorWindow.DockManager.AddDock( "MCP", "hub", dock, DockArea.Right );
+			// DockArea no longer has a Floating value; AddDock returns the
+			// DockWidget wrapper, and Float() pops it out into its own window
+			// (the user can still re-dock it by dragging it onto an edge)
+			var dockWidget = EditorWindow.DockManager.AddDock( "MCP", "hub", dock, DockArea.Right );
+			dockWidget.Float();
 			dock.Size = McpSettings.DockSize;
 		}
 
+		// closing a dock only hides it (the widget stays alive), so a still-valid
+		// instance must be re-shown explicitly - RaiseDock alone does nothing for
+		// a closed dock
+		EditorWindow.DockManager.SetDockState( "MCP", true );
 		EditorWindow.DockManager.RaiseDock( dock );
 		return dock;
 	}

@@ -72,7 +72,7 @@ public static class HelpTools
 
 		["animation"] = ("Animation and AnimGraph",
 			"1. Characters animate via SkinnedModelRenderer + an animgraph (.vanmgrph).\n"
-			+ "2. animgraph_list_parameters path='models/x.vanmgrph' - the knobs code can drive.\n"
+			+ "2. animator_list_parameters gameObject=id - list the active graph's exact parameter names, types and live values. For an asset not in a scene, use animgraph_list_parameters path='models/x.vanmgrph'.\n"
 			+ "3. From code: renderer.Set(\"move_speed\", value) etc.\n"
 			+ "4. Author/patch graphs: animgraph_get (json or raw kv3) then animgraph_set with full KV3; compile errors come back to you.\n"
 			+ "5. Retarget mocap/animations from fbx/bvh: retargeter_add_files (needs the Humanoid Retargeter library)."),

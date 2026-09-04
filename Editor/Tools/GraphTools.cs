@@ -6,6 +6,7 @@ using Editor;
 using Sandbox;
 using SboxMcp.Registry;
 using static SboxMcp.Tools.AssetTools;
+using static SboxMcp.Tools.ToolHelpers;
 
 namespace SboxMcp.Tools;
 
@@ -71,6 +72,38 @@ public static class GraphTools
 
 		return new { path = asset.Path, count = parameters.Length, parameters };
 	}
+
+	[McpTool( "animator_list_parameters", "Lists every parameter on a GameObject's active SkinnedModelRenderer animation graph, including each current value. Use this before wiring animation code so parameter names and types are never guessed.", ToolCategory.AnimGraph )]
+	public static object AnimatorListParameters(
+		[Desc( "GameObject id or unique name with a SkinnedModelRenderer" )] string gameObject )
+	{
+		var go = FindGameObject( gameObject );
+		var renderer = go.Components.Get<SkinnedModelRenderer>()
+			?? throw new InvalidOperationException( $"'{go.Name}' has no SkinnedModelRenderer" );
+		var graph = renderer.Parameters.Graph ?? renderer.AnimationGraph
+			?? throw new InvalidOperationException( $"'{go.Name}' has no active animation graph" );
+
+		var parameters = Enumerable.Range( 0, graph.ParamCount )
+			.Select( i =>
+			{
+				var name = graph.GetParameterName( i );
+				var type = graph.GetParameterType( i );
+				return new { name, type = type?.Name, value = AnimatorValue( renderer, name, type ) };
+			} )
+			.ToArray();
+
+		return new { gameObjectId = go.Id, graph = graph.Name, count = parameters.Length, parameters };
+	}
+
+	static object AnimatorValue( SkinnedModelRenderer renderer, string name, Type type ) => type switch
+	{
+		_ when type == typeof( bool ) => renderer.GetBool( name ),
+		_ when type == typeof( float ) => renderer.GetFloat( name ),
+		_ when type == typeof( int ) => renderer.GetInt( name ),
+		_ when type == typeof( Vector3 ) => V( renderer.GetVector( name ) ),
+		_ when type == typeof( Rotation ) => A( renderer.GetRotation( name ) ),
+		_ => null
+	};
 
 	// ---- ShaderGraph -----------------------------------------------------
 

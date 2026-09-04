@@ -4,7 +4,7 @@
 
 **An MCP server that runs inside the s&box editor.** Connect Claude Code, Claude Desktop, Cursor or VS Code and let AI build *and playtest* games in the editor — scenes, GameObjects, components, prefabs, assets, materials, sounds, input actions, **imported maps and cloud content**, ModelDoc, AnimGraph, ShaderGraph, ActionGraph, code files (C#/Razor/SCSS), console diagnostics, play mode and screenshots.
 
-**~160 tools** plus a dynamic invocation layer (any engine method is callable), live self-updating API discovery, a diagnostics/observability suite for driving play mode autonomously, built-in workflow recipes (`help`), an in-editor dashboard, and a two-step setup.
+**~160 server-side tools** behind a two-tool lookup gateway, plus a dynamic invocation layer (any engine method is callable), live self-updating API discovery, a diagnostics/observability suite for driving play mode autonomously, built-in workflow recipes (`help`), an in-editor dashboard, and a two-step setup.
 
 ## Setup
 
@@ -13,7 +13,16 @@
 
 The server starts automatically with the editor and listens on `http://127.0.0.1:9090/sbox-mcp` (port configurable in Settings).
 
-### Client configs at a glance
+## Context-efficient tool discovery
+
+MCP clients see only two tools, so the full catalog and its schemas do not consume the model's context:
+
+- **`tool_search`** — finds up to five enabled tools by exact name or intent and returns only those authoritative schemas. Exact-name lookups return one result.
+- **`tool_call`** — invokes a selected tool with its normal availability and permission checks.
+
+The complete registry stays server-side. Existing clients that call a known tool name directly remain compatible.
+
+## Client configs at a glance
 
 **Claude Code**
 ```bash
@@ -98,12 +107,13 @@ So "add a player" isn't a special tool — the AI finds `PlayerController` with 
 | `asset_` | Search, info, compile, create resource, duplicate/delete, raw read/write of any text asset |
 | `material_` / `soundevent_` / `texture_` / `sound_` | Create materials, sound events, textures; play 2D/3D sound |
 | `cloud_` | Search & install sbox.game content, **load a cloud map** (enabled by default) |
-| `modeldoc_` / `animgraph_` / `shadergraph_` / `actiongraph_` | Read as JSON / write KV3, list parameters/nodes, auto-collision |
+| `modeldoc_` / `animgraph_` / `animator_` / `shadergraph_` / `actiongraph_` | Read as JSON / write KV3, list graph parameters/nodes, inspect live animator parameter values, auto-collision |
 | `input_` / `project_` / `convar_` | Input actions, startup scene, console variables |
 | `code_` | List/read/write/edit C#, Razor, SCSS, shaders (auto hot-reload), scaffold a component, `compile_await`, `build_info`, run a static method (args + Task-aware) |
 | `api_` | Search/read the whole type surface; export & auto-refresh a full current-build reference |
 | `invoke_` / `*_static_property` / `*_component_property` | Dynamic layer — call any method (Task-aware), read/write any static or instance member |
 | `editor_` | Console logs (+ cursor), `logs_search`, screenshots (incl. from any angle & live play POV), play/stop, `session_info`, **`perf_get_stats`**, console commands, project info, selection |
+| `tool_search` / `tool_call` | Discover and invoke the full server-side catalog without loading every schema into context |
 | `batch` / `server_` / `help` | Batch calls, adjust server config over MCP, step-by-step recipes |
 | `retargeter_` / `animeditor_` / `lib_` | Reflection-only integrations with other libraries + your imported tools |
 

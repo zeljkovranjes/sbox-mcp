@@ -27,6 +27,7 @@ public sealed class McpServer : IDisposable
 	public const string EndpointPath = "/sbox-mcp";
 
 	readonly ToolRegistry _registry;
+	readonly ToolGateway _gateway;
 	readonly Func<RegisteredTool, JsonElement?, Task<object>> _invoker;
 	readonly ConcurrentDictionary<string, McpSession> _sessions = new();
 
@@ -43,6 +44,7 @@ public sealed class McpServer : IDisposable
 	public McpServer( ToolRegistry registry, Func<RegisteredTool, JsonElement?, Task<object>> invoker )
 	{
 		_registry = registry;
+		_gateway = new ToolGateway( registry );
 		_invoker = invoker;
 	}
 
@@ -247,7 +249,7 @@ public sealed class McpServer : IDisposable
 
 			case "tools/list":
 				return (200, JsonRpcWriter.Result( rpc.Id,
-					McpResults.ToolsList( _registry.Tools.Where( t => t.IsAvailable ).Select( t => t.Descriptor ) ) ), null);
+					McpResults.ToolsList( _gateway.Descriptors ) ), null);
 
 			case "tools/call":
 				return (200, await CallTool( rpc ), null);
@@ -266,6 +268,37 @@ public sealed class McpServer : IDisposable
 		}
 
 		var name = nameEl.GetString();
+
+		if ( name == ToolGateway.SearchToolName )
+		{
+			JsonElement? searchArgs = p.TryGetProperty( "arguments", out var searchValue )
+				&& searchValue.ValueKind == JsonValueKind.Object ? searchValue : null;
+
+			try
+			{
+				return JsonRpcWriter.Result( rpc.Id, McpResults.TextContent( _gateway.Search( searchArgs ) ) );
+			}
+			catch ( Exception e )
+			{
+				return JsonRpcWriter.Result( rpc.Id, McpResults.TextContent( e.Message, isError: true ) );
+			}
+		}
+
+		if ( name == ToolGateway.CallToolName )
+		{
+			try
+			{
+				JsonElement? callArgs = p.TryGetProperty( "arguments", out var callValue )
+					&& callValue.ValueKind == JsonValueKind.Object ? callValue : null;
+				var resolved = _gateway.ResolveCall( callArgs );
+				return await InvokeRegisteredTool( rpc.Id, resolved.Tool, resolved.Arguments );
+			}
+			catch ( Exception e )
+			{
+				return JsonRpcWriter.Result( rpc.Id, McpResults.TextContent( e.Message, isError: true ) );
+			}
+		}
+
 		var tool = _registry.Find( name );
 		if ( tool is null )
 			return JsonRpcWriter.Error( rpc.Id, JsonRpcError.InvalidParams, $"Unknown tool '{name}'" );
@@ -279,17 +312,22 @@ public sealed class McpServer : IDisposable
 		JsonElement? args = p.TryGetProperty( "arguments", out var a ) && a.ValueKind == JsonValueKind.Object
 			? a : null;
 
+		return await InvokeRegisteredTool( rpc.Id, tool, args );
+	}
+
+	async Task<string> InvokeRegisteredTool( JsonElement? rpcId, RegisteredTool tool, JsonElement? args )
+	{
 		try
 		{
 			var result = await _invoker( tool, args );
 
 			return result is RawMcpResult raw
-				? JsonRpcWriter.Result( rpc.Id, raw.Payload )
-				: JsonRpcWriter.Result( rpc.Id, McpResults.TextContent( ToolRegistry.FormatResult( result ) ) );
+				? JsonRpcWriter.Result( rpcId, raw.Payload )
+				: JsonRpcWriter.Result( rpcId, McpResults.TextContent( ToolRegistry.FormatResult( result ) ) );
 		}
 		catch ( Exception e )
 		{
-			return JsonRpcWriter.Result( rpc.Id, McpResults.TextContent( e.Message, isError: true ) );
+			return JsonRpcWriter.Result( rpcId, McpResults.TextContent( e.Message, isError: true ) );
 		}
 	}
 
